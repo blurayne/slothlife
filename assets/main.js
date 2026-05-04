@@ -1324,6 +1324,7 @@ function fractalBranch(relAngle,natCurve,length,thick,depth,maxDepth){
 //  SCENE STATE
 // ════════════════════════════════════════════════════════
 let roots=[], trunkBX,trunkBY,trunkTX,trunkTY,trunkLen;
+let deadTrunks = [];   // weathered stumps / fallen logs in the grass
 let clouds=[], particles=[], grassBlades=[];
 // Time since the user last interacted with the canvas (used for sleep mode)
 let userIdleT = 0;
@@ -1484,6 +1485,8 @@ function buildTree(){
   if(slothMode){ sloth=null; slothPending=true; }
   // refresh fruits on the new tree
   if(fruitsMode) spawnFruits();
+  // re-roll the scattered dead stumps so they shuffle alongside the tree
+  makeDeadTrunks();
 }
 // Recompute everything that depends on canvas dimensions but DON'T
 // reshuffle the random background theme. Called both on initial load
@@ -1501,6 +1504,7 @@ function resizeScene(){
   }));
   particles=Array.from({length:80},()=>mkParticle(true));
   makeGrassBlades();
+  makeDeadTrunks();
   makeStars();
   // Re-fit the existing background theme to the new canvas size. setBgTheme
   // re-runs the corresponding makeX() generator with the new W/H, so peaks
@@ -1610,6 +1614,87 @@ function makeGrassBlades(){
     bucket.blades.push(blade);
   }
   grassBuckets = Array.from(map.values());
+}
+
+// Random weathered stumps + fallen logs scattered along the grass strip.
+// Spread across the pannable world width; ~1 in 3 are knocked over for
+// variety. Re-rolled by buildTree() so SHUFFLE / depth-change randomises
+// the props alongside the tree.
+function makeDeadTrunks(){
+  deadTrunks = [];
+  const count = 6 + ((Math.random() * 4) | 0);   // 6–9 props
+  const groundDepth = H - trunkBY;
+  for(let i = 0; i < count; i++){
+    const fallen = Math.random() < 0.30;
+    // Spread across [W/2 − PAN_RANGE, W/2 + PAN_RANGE]; keep a small
+    // gap around the live trunk so props don't grow inside the roots.
+    let x;
+    do {
+      x = W * 0.5 + (Math.random() * 2 - 1) * (PAN_RANGE - 30);
+    } while (Math.abs(x - W * 0.5) < 80);
+    const yOff = Math.random() * groundDepth * 0.20;
+    const baseY = trunkBY + 6 + yOff;
+    const h = fallen
+      ? 14 + Math.random() * 12
+      : 18 + Math.random() * 38;
+    const w = 10 + Math.random() * 16;
+    const tilt = (Math.random() - 0.5) * 0.20;
+    const angle = fallen
+      ? (Math.random() < 0.5 ? -1 : 1) * (PI * 0.45 + Math.random() * 0.10)
+      : tilt;
+    const tint = Math.random();
+    const bark = `rgb(${(72 + tint*30)|0}, ${(56 + tint*22)|0}, ${(40 + tint*18)|0})`;
+    const core = `rgb(${(112 + tint*30)|0}, ${(86 + tint*22)|0}, ${(58 + tint*18)|0})`;
+    deadTrunks.push({ x, baseY, h, w, angle, fallen, bark, core,
+                      seed: Math.random() });
+  }
+  // Sort by Y so further-back props draw first — cheap depth feel.
+  deadTrunks.sort((a, b) => a.baseY - b.baseY);
+}
+
+function drawDeadTrunks(){
+  for(const t of deadTrunks){
+    ctx.save();
+    ctx.translate(t.x, t.baseY);
+    ctx.rotate(t.angle);
+    // Trunk body — slight taper toward the top.
+    ctx.fillStyle = t.bark;
+    ctx.beginPath();
+    ctx.moveTo(-t.w * 0.5, 0);
+    ctx.lineTo(-t.w * 0.40, -t.h);
+    ctx.lineTo( t.w * 0.40, -t.h);
+    ctx.lineTo( t.w * 0.5, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Lighter core stripe down one side for shape.
+    ctx.fillStyle = t.core;
+    ctx.beginPath();
+    ctx.moveTo(-t.w * 0.10, 0);
+    ctx.lineTo(-t.w * 0.05, -t.h);
+    ctx.lineTo( t.w * 0.10, -t.h);
+    ctx.lineTo( t.w * 0.18, 0);
+    ctx.closePath();
+    ctx.fill();
+    if(!t.fallen){
+      // Jagged broken top — three short peaks.
+      ctx.fillStyle = '#1a0e08';
+      ctx.beginPath();
+      ctx.moveTo(-t.w * 0.40, -t.h);
+      ctx.lineTo(-t.w * 0.20, -t.h - 4);
+      ctx.lineTo(  0,           -t.h + 1);
+      ctx.lineTo( t.w * 0.20, -t.h - 5);
+      ctx.lineTo( t.w * 0.40, -t.h);
+      ctx.closePath();
+      ctx.fill();
+      // Small knot on the bark, deterministic per seed.
+      const knotY = -t.h * (0.30 + 0.35 * t.seed);
+      ctx.fillStyle = 'rgba(20,12,6,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(t.w * (0.18 - 0.36 * t.seed), knotY, 1.6, 1.2, 0, 0, PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 }
 
 function drawGrass(){
@@ -5951,6 +6036,10 @@ function frame(ts){
   drawBg();
   drawParticles();
   drawTrunk();
+  // Dead stumps + fallen logs sit in the grass — drawn before drawGrass
+  // so blades partially occlude their bases (looks like they're in the
+  // tall grass instead of stickered onto a flat field).
+  drawDeadTrunks();
   drawGrass();
   for(const r of roots) r.draw();
   if(fruitsMode){
