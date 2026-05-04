@@ -246,6 +246,10 @@ let pixelMode = false;
 let slothMode = true;
 let blurBgMode = true;
 let sunShadeMode = false;
+// Per-frame sun-light direction, recomputed in frame(). -1 = sun on
+// the far left, +1 = sun on the far right, 0 = sun directly overhead
+// (or SUN SHADE off / raining / sun below the horizon).
+let _sunBias = 0;
 let sunShadowMode = true;
 let weightMode = true;
 
@@ -1223,6 +1227,29 @@ class Branch {
         r = Math.round(r + (12 - r) * wn);
         g = Math.round(g + (10 - g) * wn);
         b = Math.round(b + (14 - b) * wn);
+      }
+    }
+    // SUN SHADE: brighten branches whose midpoint sits on the sun
+    // side of the canvas, darken those on the shadow side. Strength
+    // scales with how horizontal the sun is (|_sunBias|), so noon
+    // light barely shifts anything and rake-light at sunrise/sunset
+    // makes the contrast obvious.
+    if(_sunBias){
+      const branchCx = (this.sx + this.ex) * 0.5;
+      const sideNorm = Math.max(-1, Math.min(1,
+        (branchCx - W * 0.5) / (W * 0.5)));
+      // lit > 0 → branch on the sun side; lit < 0 → shadow side.
+      const lit = sideNorm * _sunBias;
+      if(lit > 0){
+        const k = lit * 0.40;
+        r = Math.round(r + (235 - r) * k);
+        g = Math.round(g + (200 - g) * k);
+        b = Math.round(b + (140 - b) * k);
+      } else {
+        const k = -lit * 0.45;
+        r = Math.round(r * (1 - k));
+        g = Math.round(g * (1 - k));
+        b = Math.round(b * (1 - k));
       }
     }
     ctx.beginPath();
@@ -5795,6 +5822,30 @@ function drawTrunk(){
   }
   ctx.fillStyle=tg; ctx.fill();
 
+  // SUN SHADE: lay a directional warm-light → cool-shadow gradient
+  // across the trunk, brightest on the sun-facing side. The clip from
+  // the bark-stripe pass (a few lines down) would bound it; do it here
+  // before the clip so it covers the whole trunk fill.
+  if(_sunBias){
+    ctx.save();
+    ctx.clip();
+    const sg = ctx.createLinearGradient(trunkBX-bw, 0, trunkBX+bw, 0);
+    if(_sunBias > 0){
+      // Sun on the right → highlight right edge, shadow left edge.
+      sg.addColorStop(0,   `rgba(0,0,0,${0.30 * _sunBias})`);
+      sg.addColorStop(0.5, 'rgba(0,0,0,0)');
+      sg.addColorStop(1,   `rgba(255,225,170,${0.32 * _sunBias})`);
+    } else {
+      const k = -_sunBias;
+      sg.addColorStop(0,   `rgba(255,225,170,${0.32 * k})`);
+      sg.addColorStop(0.5, 'rgba(0,0,0,0)');
+      sg.addColorStop(1,   `rgba(0,0,0,${0.30 * k})`);
+    }
+    ctx.fillStyle = sg;
+    ctx.fillRect(trunkBX - bw - 2, topY - 4, bw * 2 + 4, trunkBY - topY + 14);
+    ctx.restore();
+  }
+
   // Bark stripes — also bend with the trunk
   ctx.save(); ctx.clip();
   ctx.strokeStyle='rgba(0,0,0,0.09)'; ctx.lineWidth=1;
@@ -5843,6 +5894,17 @@ function frame(ts){
   // canvas so the pause overlay + UI stays interactive.
   if(paused) dt = 0;
   Wind.tick(dt);
+  // Recompute the sun-side bias once per frame so the trunk + branch
+  // shading downstream all read the same value. 0 = no shading
+  // (toggle off, raining, or sun below the horizon).
+  _sunBias = 0;
+  if(sunShadeMode && rainIntensity < 0.05){
+    const sun = getSunPos(dayTime);
+    if(sun.opacity > 0){
+      _sunBias = ((sun.x - W * 0.5) / (W * 0.5)) * sun.opacity;
+      _sunBias = Math.max(-1, Math.min(1, _sunBias));
+    }
+  }
   Audio.updateWind(Wind.str);
 
   // Idle timer — sloth dozes off after 3s of no canvas touches.
