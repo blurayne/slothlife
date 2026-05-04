@@ -199,9 +199,12 @@ function applyZoom(){
   tZoom.classList.toggle('on', zoomMode);
   lZoom.textContent = zoomMode ? 'ON' : 'OFF';
   // Switching the feature off while zoomed snaps the view back so the
-  // user isn't left looking at a magnified frame they can't restore.
+  // user isn't left looking at a magnified or shifted frame they can't
+  // restore — vertical pan only takes effect when zoomed, so reset both.
   if(!zoomMode){
     worldZoom = 1.0;
+    sceneOffsetY = 0;
+    panVelY = 0;
     pinch = null;
   }
 }
@@ -1287,6 +1290,12 @@ let sceneOffsetX = 0;
 let panVelX = 0;            // momentum after release
 const PAN_RANGE = 600;      // how far left/right the camera can travel
 const PAN_FRICTION = 0.92;
+// Vertical scroll offset — only takes effect when zoomed in. At
+// worldZoom = 1 the world fits the screen vertically so Y pan is
+// snapped back to 0; at zoom Z the maximum |sceneOffsetY| that keeps
+// the world's top/bottom reachable is H/2 · (1 − 1/Z).
+let sceneOffsetY = 0;
+let panVelY = 0;
 
 
 // ── HUNGER ────────────────────────────────────────────
@@ -3427,30 +3436,33 @@ function getCanvasXY(e){
   const r=canvas.getBoundingClientRect();
   return { x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height) };
 }
-// Camera transform: zoom around the canvas centre, then horizontal pan.
-// One source of truth — every place that draws world content saves the
-// context, calls this, and restores afterwards.
+// Camera transform: zoom around the canvas centre, then pan in both
+// axes. One source of truth — every place that draws world content
+// saves the context, calls this, and restores afterwards.
 function applyCameraTransform(){
   const cx = W * 0.5, cy = H * 0.5;
   ctx.translate(cx, cy);
   ctx.scale(worldZoom, worldZoom);
-  ctx.translate(-cx + sceneOffsetX, -cy);
+  ctx.translate(-cx + sceneOffsetX, -cy + sceneOffsetY);
 }
-// Inverse of applyCameraTransform — at zoom = 1 these collapse to the
-// previous (cx - sceneOffsetX) / (cy) so existing call sites stay correct.
+// Inverse of applyCameraTransform — at zoom = 1 with sceneOffsetY = 0
+// these collapse to the previous (cx - sceneOffsetX) / cy so existing
+// call sites stay correct.
 function canvasToWorldX(canvasX){
   return (canvasX - W * 0.5) / worldZoom + W * 0.5 - sceneOffsetX;
 }
 function canvasToWorldY(canvasY){
-  return (canvasY - H * 0.5) / worldZoom + H * 0.5;
+  return (canvasY - H * 0.5) / worldZoom + H * 0.5 - sceneOffsetY;
 }
 
 // ── PAN STATE / HANDLERS ────────────────────────────
 let isPanning = false;
 let panStartX = 0;            // canvas-space starting x
 let panStartY = 0;
-let panStartOffset = 0;       // sceneOffsetX at swipe start
+let panStartOffset  = 0;      // sceneOffsetX at swipe start
+let panStartOffsetY = 0;      // sceneOffsetY at swipe start
 let panLastX = 0;
+let panLastY = 0;
 let panLastT = 0;
 const PAN_DRAG_THRESHOLD = 6; // px before we commit to "panning"
 let pendingTap = null;        // {x, y} stored on pointerdown; played on click
@@ -3506,13 +3518,16 @@ canvas.addEventListener('pointerdown', e=>{
     _abortSingleFingerGestures();
     const ps = _pointerArray();
     const midCx = (ps[0].x + ps[1].x) * 0.5;
+    const midCy = (ps[0].y + ps[1].y) * 0.5;
     const dist0 = Math.max(1, Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y));
     pinch = {
       ids:       [...activePointers.keys()],
       dist0,
       zoom0:     worldZoom,
       anchorWX:  canvasToWorldX(midCx),
+      anchorWY:  canvasToWorldY(midCy),
       offset0:   sceneOffsetX,
+      offsetY0:  sceneOffsetY,
     };
     canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
     return;
@@ -3523,8 +3538,9 @@ canvas.addEventListener('pointerdown', e=>{
   // Always remember where the touch started so we can decide whether
   // it was a drag or a tap on pointerup.
   panStartX = cx;  panStartY = cy;
-  panStartOffset = sceneOffsetX;
-  panLastX = cx;   panLastT = performance.now();
+  panStartOffset  = sceneOffsetX;
+  panStartOffsetY = sceneOffsetY;
+  panLastX = cx;   panLastY = cy;   panLastT = performance.now();
   // Tap-and-hold on the sloth → start a kill-hold gesture. Pre-empts
   // the normal tap pipeline so a quick release won't fire a swing tap
   // either; the cancel handler below resets killHoldT to 0.
@@ -3558,17 +3574,19 @@ canvas.addEventListener('pointermove', e=>{
   if(activePointers.has(e.pointerId)){
     activePointers.set(e.pointerId, { x: cx, y: cy });
   }
-  // Active pinch: rescale + reanchor the X midpoint.
+  // Active pinch: rescale + reanchor BOTH midpoints.
   if(pinch && pinch.ids.includes(e.pointerId)){
     const a = activePointers.get(pinch.ids[0]);
     const b = activePointers.get(pinch.ids[1]);
     if(!a || !b){ pinch = null; return; }
     const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
     const midCx = (a.x + b.x) * 0.5;
+    const midCy = (a.y + b.y) * 0.5;
     worldZoom = clamp(pinch.zoom0 * dist / pinch.dist0, ZOOM_MIN, ZOOM_MAX);
-    // Solve for the offset that keeps the original anchor world-x under
-    // the (new) midpoint canvas-x.
+    // Solve for the offsets that keep the original anchor world point
+    // under the (new) midpoint canvas point — both axes.
     sceneOffsetX = (midCx - W * 0.5) / worldZoom + W * 0.5 - pinch.anchorWX;
+    sceneOffsetY = (midCy - H * 0.5) / worldZoom + H * 0.5 - pinch.anchorWY;
     return;
   }
   // Cancel an in-progress kill-hold if the finger drifts too far.
@@ -3583,21 +3601,30 @@ canvas.addEventListener('pointermove', e=>{
   }
   const dx = cx - panStartX;
   const dy = cy - panStartY;
-  // If the pointer moves far horizontally before lifting, treat it as a
-  // pan even if the touch began above the grass.
-  if(!isPanning && pendingTap && Math.hypot(dx, dy) > PAN_DRAG_THRESHOLD
-     && Math.abs(dx) > Math.abs(dy)){
-    isPanning = true;
-    pendingTap = null;
+  // If the pointer moves far before lifting, treat it as a pan. When
+  // we're zoomed in, any direction counts (vertical pan matters too);
+  // at zoom = 1 keep the legacy "horizontal-dominant" rule so quick
+  // diagonal taps above the grass still resolve as taps.
+  if(!isPanning && pendingTap && Math.hypot(dx, dy) > PAN_DRAG_THRESHOLD){
+    if(worldZoom > 1.001 || Math.abs(dx) > Math.abs(dy)){
+      isPanning = true;
+      pendingTap = null;
+    }
   }
   if(isPanning){
     // Drag distance maps 1:1 to the screen even when zoomed → divide by
     // the current zoom so the world feels "stuck to the finger".
     sceneOffsetX = panStartOffset + dx / worldZoom;
+    // Vertical pan only takes effect when zoomed in. At zoom = 1 the
+    // world fits the canvas vertically so we keep sceneOffsetY = 0.
+    if(worldZoom > 1.001){
+      sceneOffsetY = panStartOffsetY + dy / worldZoom;
+    }
     const now = performance.now();
     const dt2 = Math.max(1, now - panLastT) / 1000;
     panVelX = (cx - panLastX) / dt2;
-    panLastX = cx; panLastT = now;
+    panVelY = (cy - panLastY) / dt2;
+    panLastX = cx; panLastY = cy; panLastT = now;
   }
 });
 
@@ -3649,6 +3676,29 @@ canvas.addEventListener('pointercancel', e=>{
     if(sloth) sloth.killHoldT = 0;
   }
 });
+
+// Mouse-wheel zoom — same toggle as pinch (ZOOM must be ON). Anchors
+// around the cursor so scrolling on a feature keeps it under the
+// pointer, just like pinching around a finger midpoint.
+canvas.addEventListener('wheel', e=>{
+  if(!zoomMode) return;
+  if(gameState !== 'PLAYING') return;
+  e.preventDefault();
+  const {x: cx, y: cy} = getCanvasXY(e);
+  const anchorWX = canvasToWorldX(cx);
+  const anchorWY = canvasToWorldY(cy);
+  // Smooth zoom factor — exponential in deltaY so trackpad pinches
+  // (small repeated deltas) and mouse-wheel notches both feel natural.
+  // Negative deltaY = scroll up = zoom in.
+  const factor = Math.pow(1.0015, -e.deltaY);
+  worldZoom = clamp(worldZoom * factor, ZOOM_MIN, ZOOM_MAX);
+  // Re-solve offsets so the world point under the cursor stays put.
+  sceneOffsetX = (cx - W * 0.5) / worldZoom + W * 0.5 - anchorWX;
+  sceneOffsetY = (cy - H * 0.5) / worldZoom + H * 0.5 - anchorWY;
+  // Kill any inertia so the scroll doesn't fight the user.
+  panVelX = 0;
+  panVelY = 0;
+}, { passive: false });
 
 // Original tap resolution logic, factored out so swipe vs tap can both call it.
 function __runTapLogic(x, y){
@@ -4934,8 +4984,11 @@ function restartGame(){
   didWin = false;
   _endReason = '';
   livesBonusGiven = 0;
-  // Reset zoom so a fresh run always starts at the original scale.
+  // Reset zoom + camera so a fresh run always starts at the original
+  // scale, centred horizontally and vertically.
   worldZoom = 1.0;
+  sceneOffsetY = 0;
+  panVelY = 0;
   pinch = null;
   activePointers.clear();
   gameDaysElapsed = 0;
@@ -5777,20 +5830,34 @@ function frame(ts){
     if(p.x>W+110) Object.assign(p,mkParticle(false));
   }
 
-  // Apply pan friction when not actively dragging. panVelX is in
-  // canvas px/s; divide by zoom so the inertia matches the on-screen
-  // glide (one screen pixel of momentum is one pixel, not one world unit).
+  // Apply pan friction when not actively dragging. panVelX/Y are in
+  // canvas px/s; divide by zoom so inertia matches the on-screen glide
+  // (one screen pixel of momentum is one pixel, not one world unit).
   if(!isPanning){
     sceneOffsetX += panVelX * dt / worldZoom;
+    sceneOffsetY += panVelY * dt / worldZoom;
     panVelX *= Math.pow(PAN_FRICTION, dt * 60);
+    panVelY *= Math.pow(PAN_FRICTION, dt * 60);
     if(Math.abs(panVelX) < 1) panVelX = 0;
-    // Soft clamp at the edges of pan range (rubber-band)
+    if(Math.abs(panVelY) < 1) panVelY = 0;
+    // Soft clamp X at the edges of the world pan range (rubber-band).
     if(sceneOffsetX > PAN_RANGE){
       sceneOffsetX += (PAN_RANGE - sceneOffsetX) * Math.min(dt * 6, 1);
       panVelX = 0;
     } else if(sceneOffsetX < -PAN_RANGE){
       sceneOffsetX += (-PAN_RANGE - sceneOffsetX) * Math.min(dt * 6, 1);
       panVelX = 0;
+    }
+    // Y pan range depends on zoom: at Z, the maximum |sceneOffsetY|
+    // that still keeps the world's top/bottom on screen is H/2·(1−1/Z).
+    // At zoom = 1 this collapses to 0 (snap any drift back to centre).
+    const maxY = H * 0.5 * Math.max(0, 1 - 1 / worldZoom);
+    if(sceneOffsetY > maxY){
+      sceneOffsetY += (maxY - sceneOffsetY) * Math.min(dt * 6, 1);
+      panVelY = 0;
+    } else if(sceneOffsetY < -maxY){
+      sceneOffsetY += (-maxY - sceneOffsetY) * Math.min(dt * 6, 1);
+      panVelY = 0;
     }
   }
 
