@@ -5880,6 +5880,10 @@ applyPixel();   // ensure scanline state matches initial pixelMode
 applySloth();
 applySound();   // sound starts OFF — needs user gesture to enable
 applyFruits(); // fruits ON by default
+// Render the start-screen highscore table on first load too so the
+// "no scores yet" message shows for fresh players (renderHighscoreTable
+// otherwise only ran on between-runs returns to the start screen).
+renderHighscoreTable('ov-start-hs');
 // Apply the 11.5-month sleep-starvation calibration once on load so the
 // game starts with the realistic sloth-metabolism setting (≈0.23x at
 // default dayPace=1). Done here so all referenced constants (DAY_CYCLE_S
