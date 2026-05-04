@@ -98,11 +98,25 @@
   .pversion{
     font-size:9px;
     color:rgba(255,255,255,.40);
-    margin:0 0 10px;
+    margin:0 0 4px;
+    letter-spacing:.05em;
+    word-break:break-all;
+  }
+  .pversion-link{
+    font-size:9px;
+    margin:0 0 8px;
     padding-bottom:7px;
     border-bottom:1px solid rgba(255,255,255,.06);
     letter-spacing:.05em;
-    word-break:break-all;
+  }
+  .pversion-link a{
+    color:rgba(160,200,255,.70);
+    text-decoration:none;
+    border-bottom:1px dotted rgba(160,200,255,.35);
+  }
+  .pversion-link a:hover{
+    color:#fff;
+    border-bottom-color:#fff;
   }
   .psec{
     font-size:9px;letter-spacing:.20em;
