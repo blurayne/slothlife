@@ -6029,3 +6029,13 @@ renderHighscoreTable('ov-start-hs');
 // in particular) and DOM elements are fully initialized.
 calibrateHungerFor11_5Months();
 requestAnimationFrame(frame);
+
+// Service worker — network-first for HTML so a fresh deploy is picked
+// up on each navigation, cache-first for cache-busted assets. The file
+// lives at the repo root (sw.js) so its scope is the whole Pages site.
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .catch((err) => console.warn('SW registration failed:', err));
+  });
+}
