@@ -11,7 +11,7 @@
 // a freshly-installed worker takes over immediately instead of waiting
 // for every tab to close.
 
-const CACHE = 'slothlife-v1';
+const CACHE = 'slothlife-v2';
 
 self.addEventListener('install', (event) => {
   // Take over from any older worker immediately.
@@ -55,6 +55,26 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
         const root = await caches.match('./');
         if (root) return root;
+        throw e;
+      }
+    })());
+    return;
+  }
+
+  // version.js — same network-first treatment as HTML so the panel
+  // header (and the diagnostic <meta name="app-version">) never reflect
+  // stale build info even if the cache-bust query is missing or the
+  // browser somehow lands on a cached entry from an older deploy.
+  if (url.pathname.endsWith('/assets/version.js')) {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req, { cache: 'no-store' });
+        const copy = fresh.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        return fresh;
+      } catch (e) {
+        const cached = await caches.match(req);
+        if (cached) return cached;
         throw e;
       }
     })());
