@@ -5717,7 +5717,11 @@ function frame(ts){
     const tintR = Math.round(8 + mix * 30);
     const tintG = Math.round(10 + mix * 40);
     const tintB = Math.round(30 + mix * 30);
-    ctx.fillStyle = `rgba(${tintR},${tintG},${tintB},${(1 - totalDim) * 0.85})`;
+    // Cap the compound so heavy rain at night can't go darker than
+    // plain night already does (~0.58). Without this, rainIntensity=1
+    // at deep night produced ~0.70 alpha which blacked out the tree.
+    const dimAlpha = Math.min(0.55, (1 - totalDim) * 0.85);
+    ctx.fillStyle = `rgba(${tintR},${tintG},${tintB},${dimAlpha})`;
     ctx.fillRect(0, 0, W, H);
   }
   // Sun-position shade — directional warm/cool soft-light over the
