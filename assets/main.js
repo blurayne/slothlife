@@ -4917,10 +4917,14 @@ function _hudBarsRect(){
   const rightEdge    = W - 18;
   const availW       = rightEdge - minLeft;
   // Cap the combined width on very wide screens so bars stay reasonable;
-  // shrink down (but never below 160 × s) on narrow screens.
-  const cappedW      = Math.max(160 * s, Math.min(384 * s, availW));
+  // shrink down (but never below 160 × s) on narrow screens. Cap raised
+  // to accommodate the now-wider month/survival bar.
+  const cappedW      = Math.max(160 * s, Math.min(560 * s, availW));
   const barsW        = cappedW - iconD * 2 - gap * 3;
-  const hungerW      = Math.round(barsW * 0.60);
+  // Survival (month) bar gets the larger share — roughly 2× its old
+  // pixel width so the month label has room and the player can read
+  // the year-end ticks at a glance.
+  const hungerW      = Math.round(barsW * 0.40);
   const survivalW    = Math.max(40 * s, barsW - hungerW);
   // Right-anchor the [food | hunger | clock | survival] composite.
   const survivalX    = rightEdge - survivalW;
@@ -5082,16 +5086,17 @@ function drawSurvivalBar(){
   }
 
   // Month label centered on the bar — always shown so the player can
-  // read the calendar at a glance regardless of seasons mode or bar
-  // width. Uses the 3-letter MONTH_NAMES form so it fits even on
-  // narrow bars on small screens.
+  // read the calendar at a glance. Tries the full month name first
+  // (e.g. "SEPTEMBER") and falls back to the 3-letter form when the
+  // bar is too narrow for it.
   {
     ctx.save();
     ctx.font = `bold ${Math.round(9 * HUD_SCALE)}px "Courier New", monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const monthIdx = ((Math.floor(seasonTime * 12) % 12) + 12) % 12;
-    const label = MONTH_NAMES[monthIdx];
+    let label = MONTH_NAMES_FULL[monthIdx];
+    if(ctx.measureText(label).width > w - 8) label = MONTH_NAMES[monthIdx];
     const cx = x + w * 0.5;
     const cy = y + h * 0.5 + 0.5;
     // Outline for legibility against varying bar fill colours.
