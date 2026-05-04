@@ -405,6 +405,10 @@ const Audio = {
     if(on){
       this.ensureCtx();
       if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      // Pre-warm the thunder sample so the first lightning strike (in
+      // particular the user-triggered kill-by-hold one) is audible
+      // instead of silently failing the "buffer not ready" guard.
+      this._ensureThunder();
     } else if(this.gain && this.ctx){
       const t = this.ctx.currentTime;
       this.gain.gain.cancelScheduledValues(t);
