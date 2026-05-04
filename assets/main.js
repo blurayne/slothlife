@@ -1726,6 +1726,7 @@ class Sloth{
     // Eating state (drives hunger gain + chew animation)
     this.eatTarget = null;        // {kind:'leaf'|'apple', branch?, fruit?, x, y}
     this.eatProgress = 0;         // 0..1 chew animation
+    this.mouthChewT = 0;          // seconds remaining of mouth chew animation
   }
 
   // Backwards-compat accessors (used by Branch.update for sloth-weight calc)
@@ -1761,6 +1762,7 @@ class Sloth{
     this.alpha = Math.min(1, this.alpha + dt * 2.5);
     this.stateT += dt;
     this.idleT += dt;
+    if(this.mouthChewT > 0) this.mouthChewT = Math.max(0, this.mouthChewT - dt);
 
     // Blink
     this.blinkCd -= dt;
@@ -1974,6 +1976,7 @@ class Sloth{
     if(this.eatTarget.kind === 'leaf'){
       hunger = Math.min(1, hunger + HUNGER_LEAF_GAIN);
       Audio.playEatLeaf();
+      this.mouthChewT = 2.0;
       const lb = this.eatTarget.branch;
       // Remove the actual leaf from the branch's seed array so the
       // foliage visibly thins out. If we know which leaf, splice it;
@@ -2002,6 +2005,7 @@ class Sloth{
         f.alive = false;
         hunger = Math.min(1, hunger + HUNGER_APPLE_GAIN);
         Audio.playEatApple();
+        this.mouthChewT = 2.0;
       }
     }
     this.eatTarget = null;
@@ -2813,21 +2817,39 @@ _eat(dt){
     ctx.beginPath(); ctx.arc(bx-0.55, hy+3.0, 0.30, 0, PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(bx+0.55, hy+3.0, 0.30, 0, PI*2); ctx.fill();
 
-    // ── GENTLE SMILE (soft curve, slight upturned corners) ──
-    ctx.strokeStyle = '#1A0A04'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(bx-2.8, hy+4.6);
-    ctx.quadraticCurveTo(bx, hy+5.5, bx+2.8, hy+4.6);
-    ctx.stroke();
-    // Subtle upward curl at each corner
-    ctx.beginPath();
-    ctx.moveTo(bx-2.8, hy+4.6);
-    ctx.quadraticCurveTo(bx-3.2, hy+4.2, bx-3.0, hy+3.9);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(bx+2.8, hy+4.6);
-    ctx.quadraticCurveTo(bx+3.2, hy+4.2, bx+3.0, hy+3.9);
-    ctx.stroke();
+    if(this.mouthChewT > 0){
+      // ── CHEWING MOUTH ──
+      // Open/close oscillation across the 2-second window: four chews,
+      // oval mouth filling with a soft pink "tongue" hint when wide open.
+      const t = 2 - this.mouthChewT;                       // 0..2 s elapsed
+      const open = 0.5 - 0.5 * Math.cos(t * PI * 4);       // 0..1, four cycles
+      ctx.fillStyle = '#1A0A04';
+      ctx.beginPath();
+      ctx.ellipse(bx, hy + 4.7, 2.4, 0.6 + open * 1.8, 0, 0, PI*2);
+      ctx.fill();
+      if(open > 0.4){
+        ctx.fillStyle = 'rgba(220,130,110,0.75)';
+        ctx.beginPath();
+        ctx.ellipse(bx, hy + 5.1, 1.2, 0.4 * (open - 0.4), 0, 0, PI*2);
+        ctx.fill();
+      }
+    } else {
+      // ── GENTLE SMILE (soft curve, slight upturned corners) ──
+      ctx.strokeStyle = '#1A0A04'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(bx-2.8, hy+4.6);
+      ctx.quadraticCurveTo(bx, hy+5.5, bx+2.8, hy+4.6);
+      ctx.stroke();
+      // Subtle upward curl at each corner
+      ctx.beginPath();
+      ctx.moveTo(bx-2.8, hy+4.6);
+      ctx.quadraticCurveTo(bx-3.2, hy+4.2, bx-3.0, hy+3.9);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(bx+2.8, hy+4.6);
+      ctx.quadraticCurveTo(bx+3.2, hy+4.2, bx+3.0, hy+3.9);
+      ctx.stroke();
+    }
   }
 }
 
@@ -5366,7 +5388,7 @@ function frame(ts){
     if(!seasonsMode) return false;
     return getSeasonInfo(seasonTime).name === 'SUMMER';
   })();
-  if(sloth && userIdleT > 3 && sloth.state === 'HANGING' && !isSummerHungry){
+  if(sloth && userIdleT > 3 && sloth.state === 'HANGING' && !isSummerHungry && sloth.mouthChewT <= 0){
     sloth.state = 'SLEEPING';
     sloth.snoreCycleT = 0;
     sloth.lastSnoreVol = 0;
