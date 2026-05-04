@@ -76,9 +76,7 @@ const sliderDefs = [
   { id:'hungerPace',  fmt: v => v.toFixed(1) + 'x' },
   { id:'weightMult',  fmt: v => v.toFixed(1) + 'x' },
   { id:'endMonths',   fmt: v => v.toFixed(0) },
-  { id:'grass',       fmt: v => v.toFixed(2) + 'x', onChange: 'grass' },
-  { id:'musicVol',    fmt: v => Math.round(v * 100) + '%', onChange: 'musicVol' },
-  { id:'fxVol',       fmt: v => Math.round(v * 100) + '%', onChange: 'fxVol' }
+  { id:'grass',       fmt: v => v.toFixed(2) + 'x', onChange: 'grass' }
 ];
 sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
   const el  = document.getElementById('s-'+id);
@@ -91,8 +89,6 @@ sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
     if(onChange === 'time') dayTime = P.time;
     if(onChange === 'month'){ seasonTime = P.month / 12; }
     if(onChange === 'grass'){ makeGrassBlades(); }
-    if(onChange === 'musicVol'){ Audio.applyVolumes(); }
-    if(onChange === 'fxVol'){ Audio.applyVolumes(); }
   });
 });
 
@@ -807,30 +803,20 @@ const Audio = {
   },
 };
 
-// SOUND toggle wiring
-const tSound = document.getElementById('t-sound');
-const lSound = document.getElementById('l-sound');
-// Three audio modes: 'full' (music + fx), 'fx' (no music, fx only), 'off' (silent).
-// soundMode is kept as a derived boolean for any legacy code paths that
-// expect it; it's true unless audioMode is 'off'.
+// AUDIO MODE — three settings cycled via the bottom-right sound icon.
+// 'full' = music + FX, 'fx' = FX only, 'off' = silent. soundMode is a
+// derived boolean kept for any legacy code path that wants "any sound".
 const AUDIO_MODES = ['full', 'fx', 'off'];
 let audioMode = 'full';
 let soundMode = true;
 function applySound(){
-  // Derived flag: any sound at all?
   soundMode = (audioMode !== 'off');
-  // Panel toggle reflects the on/off side of things
-  tSound.classList.toggle('on', soundMode);
-  lSound.textContent = soundMode ? 'ON' : 'OFF';
   Audio.setEnabled(soundMode);
-  // Music on only in the 'full' mode. setEnabled(true) above ensured the
-  // audio context is live; now drive the music start/stop accordingly.
-  if(audioMode === 'full'){
-    Audio.startMusic();
-  } else {
-    Audio.stopMusic();
-  }
-  // Update the bottom-right cycle icon
+  // Music on only in the 'full' mode. setEnabled(true) ensured the
+  // audio context is live; drive the music start/stop accordingly.
+  if(audioMode === 'full') Audio.startMusic();
+  else                     Audio.stopMusic();
+  // Update the bottom-right cycle icon (sole audio UI now).
   const icSoundBtn = document.getElementById('ic-sound');
   if(icSoundBtn){
     icSoundBtn.classList.remove('mode-full', 'mode-fx', 'mode-off');
@@ -840,7 +826,6 @@ function applySound(){
                     :                         'No sound (click to cycle)';
   }
 }
-// Panel sound toggle now cycles through the three modes too.
 // Space toggles pause while playing. Block default scroll behavior.
 window.addEventListener('keydown', e => {
   if(e.code === 'Space' || e.key === ' '){
@@ -850,27 +835,6 @@ window.addEventListener('keydown', e => {
     }
   }
 });
-tSound.addEventListener('click', () => {
-  const idx = AUDIO_MODES.indexOf(audioMode);
-  audioMode = AUDIO_MODES[(idx + 1) % AUDIO_MODES.length];
-  applySound();
-});
-
-// TRACK selector — show the current soundtrack name and let the user
-// cycle to the next one. Calling Audio.currentTrack() also lazily
-// picks the random starting track on first use.
-const bTrack = document.getElementById('b-track');
-const vTrack = document.getElementById('v-track');
-function refreshTrackLabel(){
-  if(vTrack) vTrack.textContent = Audio.currentTrack().name;
-}
-refreshTrackLabel();
-if(bTrack){
-  bTrack.addEventListener('click', () => {
-    Audio.nextTrack();
-    refreshTrackLabel();
-  });
-}
 
 // Bottom-right icon buttons: sound on/off + fullscreen on/off.
 const icSound = document.getElementById('ic-sound');
