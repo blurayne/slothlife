@@ -55,10 +55,11 @@
     border-color:rgba(255,255,255,.22);
     background:rgba(12,28,50,.90);
   }
-  /* While the settings panel is open, fade out the other bottom-bar
-     icons (sound, fullscreen) so the panel feels modal. The gear stays
-     visible and clickable so the user can close the panel. */
-  body.panel-open .icon-btn:not(#ic-settings){
+  /* While the settings panel is open, fade out ALL bottom-bar icons
+     (gear included) so the panel feels modal. Tapping anywhere outside
+     the panel closes it (handled by the document click handler), so
+     the gear doesn't need to stay visible to dismiss. */
+  body.panel-open .icon-btn{
     opacity:0;
     pointer-events:none;
   }
