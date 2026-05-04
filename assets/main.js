@@ -4118,12 +4118,16 @@ function updateLightning(dt){
 function _spawnLightning(forceHitSloth = false){
   // Decide if THIS strike hits the sloth — very rare in normal play,
   // forced when the player kills the sloth via the tap-and-hold gesture.
-  const slothHittable = sloth && sloth.alive && (
+  // Forced strikes only need an alive, not-yet-charred sloth so the
+  // kill works regardless of state (HANGING, EATING, SLEEPING, even
+  // STARVING) and regardless of weather (rain or snow).
+  const naturalHittable = sloth && sloth.alive && !sloth.charred && (
     sloth.state === 'HANGING' || sloth.state === 'WINDUP' ||
     sloth.state === 'REACHING' || sloth.state === 'TRANSITION' ||
     sloth.state === 'EATING' || sloth.state === 'SLEEPING'
   );
-  const hitSloth = slothHittable && (forceHitSloth || (Math.random() < 0.05));
+  const forcedHittable = sloth && sloth.alive && !sloth.charred;
+  const hitSloth = forceHitSloth ? forcedHittable : (naturalHittable && Math.random() < 0.05);
 
   // Strike point
   const tx = hitSloth ? sloth.bodyX : (Math.random() * W * 1.3 - W * 0.15);
