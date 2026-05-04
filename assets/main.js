@@ -145,8 +145,6 @@ const tSloth   = document.getElementById('t-sloth');
 const lSloth   = document.getElementById('l-sloth');
 const tBlurBg     = document.getElementById('t-blurbg');
 const lBlurBg     = document.getElementById('l-blurbg');
-const tBlurClouds = document.getElementById('t-blurclouds');
-const lBlurClouds = document.getElementById('l-blurclouds');
 const tSunShade   = document.getElementById('t-sunshade');
 const lSunShade   = document.getElementById('l-sunshade');
 const tSunShadow  = document.getElementById('t-sunshadow');
@@ -158,7 +156,6 @@ const scanlines   = document.getElementById('scanlines');
 let pixelMode = false;
 let slothMode = true;
 let blurBgMode = true;
-let blurCloudsMode = false;
 let sunShadeMode = false;
 let sunShadowMode = true;
 let weightMode = true;
@@ -179,10 +176,6 @@ function applyBlurBg(){
   tBlurBg.classList.toggle('on', blurBgMode);
   lBlurBg.textContent = blurBgMode ? 'ON' : 'OFF';
 }
-function applyBlurClouds(){
-  tBlurClouds.classList.toggle('on', blurCloudsMode);
-  lBlurClouds.textContent = blurCloudsMode ? 'ON' : 'OFF';
-}
 function applySunShade(){
   tSunShade.classList.toggle('on', sunShadeMode);
   lSunShade.textContent = sunShadeMode ? 'ON' : 'OFF';
@@ -198,7 +191,6 @@ function applyWeight(){
 tPixel.addEventListener('click', ()=>{ pixelMode = !pixelMode; applyPixel(); });
 tSloth.addEventListener('click', ()=>{ slothMode = !slothMode; applySloth(); });
 tBlurBg.addEventListener('click', ()=>{ blurBgMode = !blurBgMode; applyBlurBg(); });
-tBlurClouds.addEventListener('click', ()=>{ blurCloudsMode = !blurCloudsMode; applyBlurClouds(); });
 tSunShade.addEventListener('click', ()=>{ sunShadeMode = !sunShadeMode; applySunShade(); });
 tSunShadow.addEventListener('click', ()=>{ sunShadowMode = !sunShadowMode; applySunShadow(); });
 tWeight.addEventListener('click', ()=>{ weightMode = !weightMode; applyWeight(); });
@@ -5210,10 +5202,8 @@ function drawHungerBar(){
 // ════════════════════════════════════════════════════════
 //  RENDERING (background, trunk, particles)
 // ════════════════════════════════════════════════════════
-// Cached half-resolution offscreen canvases — one for the BLUR BG snapshot
-// trick, one for rendering clouds in isolation when BLUR CLOUDS is on.
+// Cached half-resolution offscreen canvas for the BLUR BG snapshot trick.
 let _bgBlurOff = null;
-let _cloudsBlurOff = null;
 function _getBgBlurOffscreen(){
   const targetW = Math.max(1, (W * 0.5) | 0);
   const targetH = Math.max(1, (H * 0.5) | 0);
@@ -5224,17 +5214,6 @@ function _getBgBlurOffscreen(){
     _bgBlurOff = { canvas: c, ctx: c.getContext('2d'), w: targetW, h: targetH };
   }
   return _bgBlurOff;
-}
-function _getCloudsBlurOffscreen(){
-  const targetW = Math.max(1, (W * 0.5) | 0);
-  const targetH = Math.max(1, (H * 0.5) | 0);
-  if(!_cloudsBlurOff || _cloudsBlurOff.w !== targetW || _cloudsBlurOff.h !== targetH){
-    const c = document.createElement('canvas');
-    c.width = targetW;
-    c.height = targetH;
-    _cloudsBlurOff = { canvas: c, ctx: c.getContext('2d'), w: targetW, h: targetH };
-  }
-  return _cloudsBlurOff;
 }
 
 // Render the cloud puffs onto an arbitrary 2D context. Extracted so the
@@ -5326,31 +5305,8 @@ function drawBg(){
   // so a passing cloud can correctly hide a star behind it.
   drawStars(getStarOpacity(dayTime));
 
-  // ── CLOUDS — drawn after bg-blur so they have independent blur control.
-  // When BLUR CLOUDS is on, clouds are rendered to a half-res offscreen
-  // canvas and blitted back with one blur op (same single-pass trick as
-  // BLUR BG). Otherwise they go straight to main like before.
-  if(blurCloudsMode){
-    const cOff = _getCloudsBlurOffscreen();
-    cOff.ctx.clearRect(0, 0, cOff.w, cOff.h);
-    cOff.ctx.save();
-    // Match the half-res scale + the world camera pan so cloud positions
-    // line up with the main canvas's coordinate system.
-    cOff.ctx.scale(0.5, 0.5);
-    cOff.ctx.translate(sceneOffsetX, 0);
-    drawCloudsTo(cOff.ctx);
-    cOff.ctx.restore();
-    // Blit back to main with one blur op + bilinear upscale.
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.filter = 'blur(3px)';
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(cOff.canvas, 0, 0, cOff.w, cOff.h, 0, 0, W, H);
-    ctx.restore();
-  } else {
-    drawCloudsTo(ctx);
-  }
+  // ── CLOUDS — drawn after bg-blur straight to the main canvas.
+  drawCloudsTo(ctx);
 
   const wnGround = seasonsMode ? getSeasonInfo(seasonTime).winterness : 0;
   // Snow palette destinations for each gradient stop.
