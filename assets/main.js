@@ -3036,16 +3036,24 @@ _eat(dt){
 
     // ── EYES (big, almost-black, glossy with strong white catchlight) ──
     const eyeH = Math.max(0.08, 1 - this.blink*1.9);
-    // Inner round eye — almost-black with a hint of warm brown
-    ctx.fillStyle = '#1B0E06';
+    // "Dying" eye flag — sloth has hit the ground after a fall, or is
+    // in the final let-go stage of starvation. Eyes are drawn as solid
+    // black with no iris ring and no catchlight so the body reads as
+    // dead even before _die() runs.
+    const dying = this.deadOnGround === true ||
+                  this.starveDeadOnGround === true ||
+                  (this.state === 'STARVING' && this.starveLetGo === true);
+    // Inner round eye — almost-black with a hint of warm brown,
+    // pure black when the sloth is dying.
+    ctx.fillStyle = dying ? '#000' : '#1B0E06';
     ctx.beginPath();
     ctx.ellipse(bx-eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
     ctx.fill();
     ctx.beginPath();
     ctx.ellipse(bx+eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
     ctx.fill();
-    // Warm brown iris ring (subtle inner glow)
-    if(eyeH > 0.4){
+    // Warm brown iris ring (subtle inner glow) — skipped when dying.
+    if(!dying && eyeH > 0.4){
       const irisG_L = ctx.createRadialGradient(bx-eyeOffX-0.5, hy+eyeOffY-0.2, 0.3, bx-eyeOffX, hy+eyeOffY+0.2, 2.6);
       irisG_L.addColorStop(0,   'rgba(140,80,30,0.85)');
       irisG_L.addColorStop(0.55,'rgba(60,28,10,0.0)');
@@ -3062,7 +3070,8 @@ _eat(dt){
       ctx.fill();
     }
     // Strong white catchlight (the bright spark that gives the eye life)
-    if(eyeH > 0.5){
+    // — skipped when dying so the eyes look dead.
+    if(!dying && eyeH > 0.5){
       ctx.fillStyle = 'rgba(255,255,255,0.98)';
       ctx.beginPath();
       ctx.ellipse(bx-eyeOffX-0.6, hy+eyeOffY-0.5, 1.0, 0.9, 0, 0, PI*2);
