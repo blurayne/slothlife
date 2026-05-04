@@ -42,7 +42,7 @@ const P = {
   month:       3,    // 0..12 (Jan..Dec); 3.0 = April (game start)
   appleCount:  0.10,
   branchLen:   0.8,
-  grass:       1.75,
+  grass:       4.80,
   dayPace:     1.0,
   hungerPace:  2.0,
   weightMult:  1.0,
