@@ -17,6 +17,13 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# Opt the JavaScript actions in this workflow into Node.js 24 ahead of
+# GitHub's June 2026 default switch — silences the Node 20 deprecation
+# warning and keeps actions/checkout / configure-pages / upload-pages-
+# artifact / deploy-pages working when Node 20 is removed in Sep 2026.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   deploy:
     environment:
