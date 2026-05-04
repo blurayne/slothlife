@@ -3,6 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Discourage browser HTML caching so a fresh deploy is picked up
+     immediately (Pages CDN still controls origin caching). -->
+<meta http-equiv="cache-control" content="no-cache">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="0">
+<!-- Deploy SHA — view-source on the deployed page shows the real
+     commit; defaults to "dev" locally. Kept in sync with assets/
+     version.js by .github/workflows/deploy-pages.yml's sed step. -->
+<meta name="app-version" content="dev">
 <title>Windy Tree v114 — Sloth Edition</title>
 <link rel="stylesheet" href="assets/styles.css?v=dev">
 </head>
