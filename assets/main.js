@@ -2431,8 +2431,13 @@ _eat(dt){
     if(!this.alive) return;
     ctx.save();
     ctx.globalAlpha = this.alpha;
-    // Track region for charring overlay
     const charStart = this.charred;
+    // Charred-sloth rendering: ctx.filter='brightness(0)' renders every
+    // subsequent path / fill / stroke as solid black (alpha preserved),
+    // so the entire sloth body+limbs come out as a pure black silhouette
+    // without using a source-atop fillRect that would (and used to)
+    // re-paint every existing canvas pixel — the heavy-rain blackout bug.
+    if(charStart) ctx.filter = 'brightness(0)';
 
     if(this.state === 'FALLING' || (this.state === 'STARVING' && this.starveLetGo)){
       ctx.save();
@@ -2456,19 +2461,15 @@ _eat(dt){
       for(const l of this.limbs) if(l.isArm)  this._drawLimb(l, drawX, drawY);
       if(this.state === 'SLEEPING') this._drawSleepZs(drawX, drawY);
     }
-    // Charred overlay — paint everything we just drew (within this save/restore
-    // alpha layer) as solid black using source-atop. Sparkly hot edges fade.
+    // Drop the brightness filter before drawing the orange spark
+    // highlights so they show their colour.
     if(charStart){
+      ctx.filter = 'none';
       const sinceChar = performance.now()/1000 - this.charredAt;
       const sparkA = Math.max(0, 1 - sinceChar / 0.6);
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = '#0a0806';
-      ctx.fillRect(-2000, -2000, 4000, 4000);
-      // Crackling orange highlights on the body for the first 0.6s
       if(sparkA > 0){
         const cx = (this.state === 'FALLING') ? this.fx : this.bodyX;
         const cy = (this.state === 'FALLING') ? this.fy : this.bodyY;
-        ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = `rgba(255, 140, 30, ${sparkA * 0.85})`;
         for(let i = 0; i < 5; i++){
           const a = Math.random() * Math.PI * 2;

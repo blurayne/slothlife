@@ -10,6 +10,7 @@ _(none)_
 
 ## Shipped
 
+- [x] **Bug fix: charred-sloth source-atop blackout (heavy-rain "screen black" bug)**
 - [x] **Cache-bust CSS/JS/audio URLs with `?v=<SHA>` injected by deploy workflow**
 - [x] [GitHub Pages — manual one-time setup](.claude/plans/github-pages-manual-setup.md)
   — Pages source, default branch, and `github-pages` environment
