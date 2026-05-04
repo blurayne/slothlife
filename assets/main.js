@@ -2332,7 +2332,12 @@ class Sloth{
     this.fy  += this.fvy * dt;
     this.frot+= this.frotv * dt;
     this.frotv*= Math.pow(0.93, dt * 60);
-    if(this.fvy > 60){
+    // Charred sloths (lightning kill) can't grab — they're limp.
+    // Without this gate the post-strike sloth starts falling right next
+    // to the branch it was on, the grab-recovery fires within ~0.2s
+    // and snaps it back to HANGING with .charred = true, so the player
+    // sees a darkened sloth that never actually falls or dies.
+    if(this.fvy > 60 && !this.charred){
       for(const b of allBranches()){
         if(b.depth < 1) continue;
         for(let t = 0.1; t <= 1; t += 0.12){
