@@ -2901,20 +2901,21 @@ class Fruit{
     this.r=5.5+Math.random()*2.2;
     this.holdStrength=0.40+Math.random()*0.40;
     this.alive=true;
-    // Apples in shades of red, orange, amber, and yellow — palette weighted
-    // toward red so the orchard still reads as red-apple country.
-    const APPLE_COLORS = [
-      // reds (×8)
+    // Apples in shades of red, orange, amber, and yellow. 60% of fruit
+    // pulls from the red bucket and 40% from the orange/amber/yellow
+    // bucket — so reds outnumber the warm-non-reds ~3:2 across the orchard.
+    const APPLE_REDS = [
       '#A93026', '#B8362A', '#BD3520', '#C03A22',
       '#C8392E', '#D03828', '#D5402F', '#D54F38',
-      // oranges (×4)
-      '#C5552A', '#D26830', '#DA723A', '#E07A2A',
-      // amber (×3)
-      '#E08828', '#E5A626', '#E89A1E',
-      // yellow (×1)
-      '#F0C020',
     ];
-    this.color = APPLE_COLORS[(Math.random() * APPLE_COLORS.length) | 0];
+    const APPLE_WARM = [
+      '#C5552A', '#D26830', '#DA723A', '#E07A2A',  // oranges
+      '#E08828', '#E5A626', '#E89A1E',             // amber
+      '#F0C020',                                   // yellow
+    ];
+    this.color = (Math.random() < 0.60)
+      ? APPLE_REDS[(Math.random() * APPLE_REDS.length) | 0]
+      : APPLE_WARM[(Math.random() * APPLE_WARM.length) | 0];
     this.swayPhase=Math.random()*PI*2;
   }
   detach(extraImpulse=0){
