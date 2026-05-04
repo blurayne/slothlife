@@ -1516,9 +1516,9 @@ function resizeScene(){
 }
 
 function init(){
-  // Pick the initial theme once at startup; preserve it across resizes.
-  const initialOptions = ['MOUNTAINS', 'FOREST', 'RAINFOREST'];
-  bgTheme = initialOptions[Math.floor(Math.random() * initialOptions.length)];
+  // Lock the starting theme to JUNGLE; the SHUFFLE button still rolls
+  // through the full BG_THEMES list during a run.
+  bgTheme = 'JUNGLE';
   resizeScene();
 }
 function mkParticle(init=false){
