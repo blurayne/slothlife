@@ -149,8 +149,6 @@ const tSunShade   = document.getElementById('t-sunshade');
 const lSunShade   = document.getElementById('l-sunshade');
 const tSunShadow  = document.getElementById('t-sunshadow');
 const lSunShadow  = document.getElementById('l-sunshadow');
-const tZoom       = document.getElementById('t-zoom');
-const lZoom       = document.getElementById('l-zoom');
 const tWeight     = document.getElementById('t-weight');
 const lWeight     = document.getElementById('l-weight');
 const scanlines   = document.getElementById('scanlines');
@@ -160,7 +158,6 @@ let slothMode = true;
 let blurBgMode = true;
 let sunShadeMode = false;
 let sunShadowMode = true;
-let zoomMode = false;             // two-finger pinch zoom (default off)
 let weightMode = true;
 
 // Camera zoom state. worldZoom always anchors around the canvas centre;
@@ -195,19 +192,6 @@ function applySunShadow(){
   tSunShadow.classList.toggle('on', sunShadowMode);
   lSunShadow.textContent = sunShadowMode ? 'ON' : 'OFF';
 }
-function applyZoom(){
-  tZoom.classList.toggle('on', zoomMode);
-  lZoom.textContent = zoomMode ? 'ON' : 'OFF';
-  // Switching the feature off while zoomed snaps the view back so the
-  // user isn't left looking at a magnified or shifted frame they can't
-  // restore — vertical pan only takes effect when zoomed, so reset both.
-  if(!zoomMode){
-    worldZoom = 1.0;
-    sceneOffsetY = 0;
-    panVelY = 0;
-    pinch = null;
-  }
-}
 function applyWeight(){
   tWeight.classList.toggle('on', weightMode);
   lWeight.textContent = weightMode ? 'ON' : 'OFF';
@@ -217,7 +201,6 @@ tSloth.addEventListener('click', ()=>{ slothMode = !slothMode; applySloth(); });
 tBlurBg.addEventListener('click', ()=>{ blurBgMode = !blurBgMode; applyBlurBg(); });
 tSunShade.addEventListener('click', ()=>{ sunShadeMode = !sunShadeMode; applySunShade(); });
 tSunShadow.addEventListener('click', ()=>{ sunShadowMode = !sunShadowMode; applySunShadow(); });
-tZoom.addEventListener('click', ()=>{ zoomMode = !zoomMode; applyZoom(); });
 tWeight.addEventListener('click', ()=>{ weightMode = !weightMode; applyWeight(); });
 
 // ════════════════════════════════════════════════════════
@@ -3512,9 +3495,9 @@ canvas.addEventListener('pointerdown', e=>{
   if(paused) return;
   // Any tap on the canvas counts as activity → reset idle timer
   userIdleT = 0;
-  // Two-finger pinch — only when ZOOM is enabled. Cancels any single-
-  // finger gesture in flight so the same finger can't ALSO be panning.
-  if(zoomMode && activePointers.size === 2){
+  // Two-finger pinch — always available. Cancels any single-finger
+  // gesture in flight so the same finger can't ALSO be panning.
+  if(activePointers.size === 2){
     _abortSingleFingerGestures();
     const ps = _pointerArray();
     const midCx = (ps[0].x + ps[1].x) * 0.5;
@@ -3677,11 +3660,10 @@ canvas.addEventListener('pointercancel', e=>{
   }
 });
 
-// Mouse-wheel zoom — same toggle as pinch (ZOOM must be ON). Anchors
-// around the cursor so scrolling on a feature keeps it under the
-// pointer, just like pinching around a finger midpoint.
+// Mouse-wheel zoom — always available. Anchors around the cursor so
+// scrolling on a feature keeps it under the pointer, just like
+// pinching around a finger midpoint.
 canvas.addEventListener('wheel', e=>{
-  if(!zoomMode) return;
   if(gameState !== 'PLAYING') return;
   e.preventDefault();
   const {x: cx, y: cy} = getCanvasXY(e);
