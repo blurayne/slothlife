@@ -97,16 +97,28 @@ sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
 });
 
 // ════════════════════════════════════════════════════════
-//  PANEL TOGGLE  (button at bottom; panel slides in/out)
+//  PANEL TOGGLE  (gear icon, bottom-right; panel slides in/out)
 // ════════════════════════════════════════════════════════
-const panel  = document.getElementById('panel');
-const toggle = document.getElementById('toggle');
+const panel    = document.getElementById('panel');
+const icSettings = document.getElementById('ic-settings');
 let panelOpen = false;   // start collapsed
 function applyPanelState(){
   panel.classList.toggle('hidden', !panelOpen);
-  toggle.textContent = panelOpen ? 'CLOSE' : 'PARAMS';
+  icSettings.classList.toggle('active', panelOpen);
 }
-toggle.addEventListener('click', ()=>{ panelOpen = !panelOpen; applyPanelState(); });
+icSettings.addEventListener('click', (e)=>{
+  e.stopPropagation();   // don't let the document handler immediately close it
+  panelOpen = !panelOpen;
+  applyPanelState();
+});
+// Tap anywhere outside the panel (and outside the gear button) to close it.
+document.addEventListener('click', (e)=>{
+  if(!panelOpen) return;
+  if(panel.contains(e.target)) return;
+  if(icSettings.contains(e.target)) return;
+  panelOpen = false;
+  applyPanelState();
+});
 applyPanelState();
 
 // ════════════════════════════════════════════════════════

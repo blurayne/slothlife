@@ -12,29 +12,6 @@
   #wtrack{width:80px;height:2px;background:rgba(255,255,255,.10);margin-top:2px}
   #wfill{height:100%;background:rgba(200,232,255,.55);width:0}
 
-  /* PARAMS button — centered at bottom */
-  #toggle{
-    position:fixed;bottom:18px;left:50%;
-    transform:translateX(-50%);
-    background:rgba(6,12,20,.78);
-    backdrop-filter:blur(8px);
-    -webkit-backdrop-filter:blur(8px);
-    border:1px solid rgba(255,255,255,.08);
-    border-radius:6px;
-    padding:9px 22px;
-    font:11px 'Courier New',monospace;
-    color:rgba(195,222,255,.60);
-    letter-spacing:.18em;
-    cursor:pointer;outline:none;
-    transition:color .15s,border-color .15s,background .15s;
-    z-index:11;
-  }
-  #toggle:hover{
-    color:rgba(255,255,255,.95);
-    border-color:rgba(255,255,255,.22);
-    background:rgba(12,28,50,.90);
-  }
-
   /* Quick-action icon buttons — bottom-right corner */
   .icon-btn{
     position:fixed;bottom:18px;
@@ -69,8 +46,15 @@
   .icon-btn.mode-full .icon-full { display:block; }
   .icon-btn.mode-fx   .icon-fx   { display:block; }
   .icon-btn.mode-off  .icon-mute { display:block; }
-  #ic-sound { right:66px; }
-  #ic-full  { right:18px; }
+  #ic-settings { right:114px; }
+  #ic-sound    { right:66px;  }
+  #ic-full     { right:18px;  }
+  /* Brighten the settings cog while the panel is open. */
+  #ic-settings.active{
+    color:rgba(255,255,255,.95);
+    border-color:rgba(255,255,255,.22);
+    background:rgba(12,28,50,.90);
+  }
 
   /* PANEL — slides in from right edge */
   #panel{
