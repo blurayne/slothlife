@@ -5216,9 +5216,7 @@ function _getBgBlurOffscreen(){
   return _bgBlurOff;
 }
 
-// Render the cloud puffs onto an arbitrary 2D context. Extracted so the
-// same code can target either the main canvas (ctx) or an offscreen
-// canvas when BLUR CLOUDS is enabled.
+// Render the cloud puffs onto an arbitrary 2D context.
 function drawCloudsTo(targetCtx){
   const sunUp = (dayTime > 0.22 && dayTime < 0.78);
   const lightT = clamp((dayTime > 0.5 ? 1 - dayTime : dayTime) * 4 - 0.5, 0, 1);
