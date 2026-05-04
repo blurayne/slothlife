@@ -245,48 +245,65 @@ const Audio = {
     this.noiseSrc.start();
   },
 
-  // ── BACKGROUND MUSIC — Mossy Perch, fetched from assets/audio/ as mp3.
+  // ── BACKGROUND MUSIC — soundtrack of looped mp3s in assets/audio/.
   // Played through its own gain node so it can be enabled/disabled
-  // independently of sound effects.
-  _musicBuffer: null,
+  // independently of sound effects. Game starts on a random track and
+  // the user can advance to the next track from the settings panel.
+  _musicTracks: [
+    { name: 'Mossy Perch',    url: 'assets/audio/mossy-perch.mp3'    },
+    { name: 'Selva Lenta',    url: 'assets/audio/selva-lenta.mp3'    },
+    { name: 'Canopy Drift',   url: 'assets/audio/canopy-drift.mp3'   },
+    { name: 'Selva Lenta II', url: 'assets/audio/selva-lenta-ii.mp3' },
+  ],
+  _musicIndex: -1,                           // -1 → pick random on first use
+  _musicBuffers: Object.create(null),        // url → AudioBuffer cache
+  _musicLoadingUrl: null,                    // URL of fetch currently in flight
   _musicSource: null,
   _musicGain: null,
-  _musicLoading: false,
-  _musicWanted: false,        // most-recent intent: should music be playing?
-  _musicSampleUrl: 'assets/audio/mossy-perch.mp3',
+  _musicWanted: false,                       // intent: should music be playing?
+  currentTrack(){
+    if(this._musicIndex < 0 || this._musicIndex >= this._musicTracks.length){
+      this._musicIndex = Math.floor(Math.random() * this._musicTracks.length);
+    }
+    return this._musicTracks[this._musicIndex];
+  },
   _ensureMusicBuffer(cb){
     if(!this.ctx) return;
-    if(this._musicBuffer){ cb && cb(); return; }
-    if(this._musicLoading) return;        // fetch/decode already in flight
-    this._musicLoading = true;
+    const track = this.currentTrack();
+    if(this._musicBuffers[track.url]){ cb && cb(); return; }
+    if(this._musicLoadingUrl === track.url) return;  // already fetching this one
+    this._musicLoadingUrl = track.url;
     const ctx = this.ctx;
-    fetch(this._musicSampleUrl)
+    const url = track.url;
+    fetch(url)
       .then(r => {
         if(!r.ok) throw new Error('HTTP ' + r.status);
         return r.arrayBuffer();
       })
       .then(buf => ctx.decodeAudioData(buf))
       .then(buffer => {
-        this._musicBuffer = buffer;
-        this._musicLoading = false;
-        // If music was requested while we were loading, kick it off now.
-        if(this._musicWanted) this.startMusic();
+        this._musicBuffers[url] = buffer;
+        if(this._musicLoadingUrl === url) this._musicLoadingUrl = null;
+        // Kick off playback if music is wanted and the user hasn't
+        // switched to a different track in the meantime.
+        if(this._musicWanted && this.currentTrack().url === url) this.startMusic();
         cb && cb();
       })
       .catch(err => {
         console.warn('Music sample load failed:', err);
-        this._musicLoading = false;
+        if(this._musicLoadingUrl === url) this._musicLoadingUrl = null;
       });
   },
   startMusic(){
     this._musicWanted = true;
     if(!this.enabled || !this.ctx) return;
     this._ensureMusicBuffer();
-    if(!this._musicBuffer) return;        // still decoding — will retry
+    const buffer = this._musicBuffers[this.currentTrack().url];
+    if(!buffer) return;                   // still loading — will retry on decode
     if(this._musicSource) return;         // already playing
     const ctx = this.ctx;
     const src = ctx.createBufferSource();
-    src.buffer = this._musicBuffer;
+    src.buffer = buffer;
     src.loop = true;
     const g = ctx.createGain();
     g.gain.value = 0;
@@ -301,6 +318,11 @@ const Audio = {
   },
   stopMusic(){
     this._musicWanted = false;
+    this._stopMusicSource();
+  },
+  // Internal: fade out + dispose the current source without changing
+  // _musicWanted. Used both by stopMusic() and by track switching.
+  _stopMusicSource(){
     if(!this._musicSource || !this.ctx) return;
     const ctx = this.ctx;
     const t = ctx.currentTime;
@@ -309,7 +331,6 @@ const Audio = {
     g.gain.cancelScheduledValues(t);
     g.gain.setValueAtTime(g.gain.value, t);
     g.gain.linearRampToValueAtTime(0, t + 0.6);
-    // Stop the source after the fade so it can be restarted cleanly
     setTimeout(() => {
       try { src.stop(); } catch(e){}
       try { src.disconnect(); } catch(e){}
@@ -318,6 +339,23 @@ const Audio = {
     this._musicSource = null;
     this._musicGain = null;
   },
+  // Switch to a specific track (wraps around). If music is currently
+  // playing, fades out the old track and fades in the new one after a
+  // short gap; otherwise just updates the index for next time.
+  setTrack(idx){
+    const n = this._musicTracks.length;
+    this._musicIndex = ((idx % n) + n) % n;
+    if(this._musicSource){
+      const wasWanted = this._musicWanted;
+      this._stopMusicSource();
+      if(wasWanted){
+        // Wait past the 700ms fade-out so the two tracks don't overlap.
+        setTimeout(() => { if(this._musicWanted) this.startMusic(); }, 750);
+      }
+    }
+    return this.currentTrack();
+  },
+  nextTrack(){ return this.setTrack(this._musicIndex + 1); },
 
   setEnabled(on){
     this.enabled = on;
@@ -756,6 +794,22 @@ tSound.addEventListener('click', () => {
   audioMode = AUDIO_MODES[(idx + 1) % AUDIO_MODES.length];
   applySound();
 });
+
+// TRACK selector — show the current soundtrack name and let the user
+// cycle to the next one. Calling Audio.currentTrack() also lazily
+// picks the random starting track on first use.
+const bTrack = document.getElementById('b-track');
+const vTrack = document.getElementById('v-track');
+function refreshTrackLabel(){
+  if(vTrack) vTrack.textContent = Audio.currentTrack().name;
+}
+refreshTrackLabel();
+if(bTrack){
+  bTrack.addEventListener('click', () => {
+    Audio.nextTrack();
+    refreshTrackLabel();
+  });
+}
 
 // Bottom-right icon buttons: sound on/off + fullscreen on/off.
 const icSound = document.getElementById('ic-sound');
