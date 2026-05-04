@@ -158,7 +158,7 @@ let pixelMode = false;
 let slothMode = true;
 let blurBgMode = true;
 let blurCloudsMode = false;
-let sunShadeMode = true;
+let sunShadeMode = false;
 let sunShadowMode = true;
 let weightMode = true;
 
