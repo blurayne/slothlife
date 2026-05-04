@@ -12,6 +12,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped
 
+- [x] [Top HUD: hearts → score (left) → bars (right)](.claude/plans/top-hud-layout-hearts-score-bars.md)
 - [x] [Eating mouth animation + sleep lock](.claude/plans/eating-mouth-animation.md)
 - [x] [Settings as rightmost icon + hide bottom bar when panel is open](.claude/plans/settings-rightmost-and-hide-bottom-bar.md)
 

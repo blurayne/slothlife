@@ -4708,55 +4708,52 @@ function restartGame(){
   bellyScale = 1.0;
 }
 
-// Score HUD — top-right, screen space (no panel, no BEST line)
+// Score HUD — number only, left-anchored just to the right of the hearts.
 function drawScoreHUD(){
   ctx.save();
   const s = HUD_SCALE;
   ctx.font = `bold ${Math.round(16 * s)}px "Courier New", monospace`;
-  ctx.textAlign = 'right';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  // Score line
-  const text = 'SCORE ' + score;
-  const x = W - 16 * s;
+  const heartsRight = 18 + MAX_LIVES * 22 * s;
+  const x = heartsRight + 12 * s;
   const y = 21 * s;
+  const text = String(score);
   ctx.lineWidth = 3.5 * s;
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
   ctx.strokeText(text, x, y);
   ctx.fillStyle = '#FFE678';
   ctx.fillText(text, x, y);
-  // Month info now lives entirely inside the SURVIVAL progress bar to
-  // the left of the score, so nothing else is drawn here.
   ctx.restore();
 }
 
 // Shared layout for the two top-HUD progress bars.
 // Returns { y, h, hungerX, hungerW, survivalX, survivalW, clockX, clockY, clockR }.
-// HUD top row: [food icon] [hunger bar] [clock] [survival bar].
-// Both icons are circles with the same diameter (~2× bar height); the
-// food icon doesn't render its own ring background — the SVG-style glyph
-// just draws over the canvas — but the layout reserves the slot.
+// HUD top row: [hearts] [score] ... [food icon | hunger | clock | survival]
+// The bar composite is right-anchored to the screen edge so the score
+// (just to the right of the hearts) gets the left side of the screen.
 function _hudBarsRect(){
   const s            = HUD_SCALE;
-  const heartsRight  = 18 + MAX_LIVES * 22 * s;     // right edge of hearts
-  const scoreLeft    = W - 130 * s;                 // approx left edge of score text
-  const totalW       = Math.max(160 * s, scoreLeft - heartsRight - 24 * s);
-  // Cap the combined width on very wide screens so bars stay reasonable.
-  const cappedW      = Math.min(totalW, 384 * s);
   const h            = 12 * s;
   const gap          = 6 * s;
   const iconD        = h * 2;                       // ≈24 × s diameter (food icon + clock)
-  // Bar widths after subtracting two icons (food, clock) and three gaps.
+  const heartsRight  = 18 + MAX_LIVES * 22 * s;     // right edge of hearts
+  const scoreReserved = 90 * s;                     // room for ~5-6 digit score
+  const minLeft      = heartsRight + 12 * s + scoreReserved + 18 * s;
+  const rightEdge    = W - 18;
+  const availW       = rightEdge - minLeft;
+  // Cap the combined width on very wide screens so bars stay reasonable;
+  // shrink down (but never below 160 × s) on narrow screens.
+  const cappedW      = Math.max(160 * s, Math.min(384 * s, availW));
   const barsW        = cappedW - iconD * 2 - gap * 3;
   const hungerW      = Math.round(barsW * 0.60);
   const survivalW    = Math.max(40 * s, barsW - hungerW);
-  // Center the whole composite in the middle slot.
-  const startX       = heartsRight + 12 * s + (scoreLeft - heartsRight - 12 * s - cappedW) * 0.5;
+  // Right-anchor the [food | hunger | clock | survival] composite.
+  const survivalX    = rightEdge - survivalW;
+  const clockCx      = survivalX - gap - iconD * 0.5;
+  const hungerX      = clockCx - iconD * 0.5 - gap - hungerW;
+  const foodCx       = hungerX - gap - iconD * 0.5;
   const y            = 14 * s;
-  // Food icon center sits at startX + iconD/2; hunger bar follows the icon + gap.
-  const foodCx      = startX + iconD * 0.5;
-  const hungerX     = startX + iconD + gap;
-  const clockCx     = hungerX + hungerW + gap + iconD * 0.5;
-  const survivalX   = hungerX + hungerW + gap + iconD + gap;
   return {
     y, h,
     foodX:     foodCx,
