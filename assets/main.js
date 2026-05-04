@@ -1281,6 +1281,7 @@ let gameOver = false;
 let gameOverAt = 0;
 let didWin = false;
 let livesBonusGiven = 0;     // recorded for the end-of-game banner
+let _lastMonthMark   = 0;    // months already credited toward score
 // Each real day-night cycle (DAY_CYCLE_S sec) counts as one in-game day.
 // The game ends after 12 days regardless of apple count. seasonsMode
 // accelerates "month feel" but the 12-day clock is in real day-cycles.
@@ -4543,7 +4544,7 @@ function drawGameOverHUD(){
 function _endGame(win){
   if(gameOver) return;
   didWin = win;
-  livesBonusGiven = Math.max(0, lives) * 100;
+  livesBonusGiven = Math.max(0, lives) * 250;
   score += livesBonusGiven;
   if(score > highScore) highScore = score;
   gameOver = true;
@@ -4630,6 +4631,7 @@ function beginPlaying(){
   livesBonusGiven = 0;
   gameDaysElapsed = 0;
   _lastYearMark = 0;
+  _lastMonthMark = 0;
   if(seasonsMode){ seasonTime = 3/12; P.month = 3; }
   _resetTreeForNewGame();
   if(fruitsMode) spawnFruits();
@@ -4673,6 +4675,7 @@ function restartGame(){
   livesBonusGiven = 0;
   gameDaysElapsed = 0;
   _lastYearMark = 0;
+  _lastMonthMark = 0;
   // Reset season clock so a fresh game starts in April.
   if(seasonsMode){ seasonTime = 3/12; P.month = 3; }
   _resetTreeForNewGame();
@@ -5320,6 +5323,14 @@ function frame(ts){
   // season bookkeeping so the tree can shed/grow leaves again next pass.
   if(gameState === 'PLAYING' && !gameOver && sloth && sloth.alive){
     if(dayAuto) gameDaysElapsed += (dt * P.dayPace) / DAY_CYCLE_S;
+    // +50 pts for each whole in-game month survived. Tracks a high-water
+    // mark so dragging the time slider backwards can't farm points and
+    // re-crossing the same boundary doesn't pay twice.
+    const monthMark = Math.floor(gameDaysElapsed);
+    if(monthMark > _lastMonthMark){
+      score += 50 * (monthMark - _lastMonthMark);
+      _lastMonthMark = monthMark;
+    }
     const yearMark = Math.floor(gameDaysElapsed / GAME_DAYS_TOTAL);
     if(yearMark > _lastYearMark){
       _lastYearMark = yearMark;

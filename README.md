@@ -12,12 +12,13 @@ hours, and try not to starve or fall.
 
 - **Tap a branch** to swing the sloth toward it.
 - **Tap an apple** for **+10 pts**, **tap a leaf** for **+1 pt**.
+- **Survive a full in-game month** for **+50 pts**.
 - **Swipe the grass** to pan the scene left or right.
 - The hunger bar drains constantly — keep eating. Sleeping slows
   the drain.
 - **Space** or tap the clock to pause.
 - A fall or starvation costs a life. Three lives total.
-- Eat every apple to win; each surviving life is **+100 pts**.
+- Eat every apple to win; each surviving life is **+250 pts**.
 
 ## Settings
 
