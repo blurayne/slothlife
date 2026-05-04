@@ -1986,7 +1986,7 @@ class Sloth{
     if(this.eatTarget.kind === 'leaf'){
       hunger = Math.min(1, hunger + HUNGER_LEAF_GAIN);
       Audio.playEatLeaf();
-      this.mouthChewT = 2.0;
+      this.mouthChewT = 4.0;
       const lb = this.eatTarget.branch;
       // Remove the actual leaf from the branch's seed array so the
       // foliage visibly thins out. If we know which leaf, splice it;
@@ -2015,7 +2015,7 @@ class Sloth{
         f.alive = false;
         hunger = Math.min(1, hunger + HUNGER_APPLE_GAIN);
         Audio.playEatApple();
-        this.mouthChewT = 2.0;
+        this.mouthChewT = 4.0;
       }
     }
     this.eatTarget = null;
@@ -2837,10 +2837,11 @@ _eat(dt){
 
     if(this.mouthChewT > 0){
       // ── CHEWING MOUTH ──
-      // Open/close oscillation across the 2-second window: four chews,
-      // oval mouth filling with a soft pink "tongue" hint when wide open.
-      const t = 2 - this.mouthChewT;                       // 0..2 s elapsed
-      const open = 0.5 - 0.5 * Math.cos(t * PI * 4);       // 0..1, four cycles
+      // Open/close oscillation across the 4-second window: two slow
+      // chews, oval mouth filling with a soft pink "tongue" hint when
+      // wide open.
+      const t = 4 - this.mouthChewT;                       // 0..4 s elapsed
+      const open = 0.5 - 0.5 * Math.cos(t * PI);           // 0..1, two cycles
       ctx.fillStyle = '#1A0A04';
       ctx.beginPath();
       ctx.ellipse(bx, hy + 4.7, 2.4, 0.6 + open * 1.8, 0, 0, PI*2);
