@@ -12,6 +12,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped
 
+- [x] **SUN SHADOW sub-toggle — directional cast shadow on the grass**
 - [x] **Version stamp at top of settings panel (deploy workflow injects build/date/SHA)**
 - [x] **Kill-by-hold = thunderstorm + lightning strike (replaces skull/desat overlay)**
 - [x] **Brighter settings panel text (alpha bumps for readability)**

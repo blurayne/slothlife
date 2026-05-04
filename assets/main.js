@@ -148,6 +148,8 @@ const tBlurClouds = document.getElementById('t-blurclouds');
 const lBlurClouds = document.getElementById('l-blurclouds');
 const tSunShade   = document.getElementById('t-sunshade');
 const lSunShade   = document.getElementById('l-sunshade');
+const tSunShadow  = document.getElementById('t-sunshadow');
+const lSunShadow  = document.getElementById('l-sunshadow');
 const tWeight     = document.getElementById('t-weight');
 const lWeight     = document.getElementById('l-weight');
 const scanlines   = document.getElementById('scanlines');
@@ -157,6 +159,7 @@ let slothMode = true;
 let blurBgMode = true;
 let blurCloudsMode = false;
 let sunShadeMode = true;
+let sunShadowMode = true;
 let weightMode = true;
 
 function applyPixel(){
@@ -183,6 +186,10 @@ function applySunShade(){
   tSunShade.classList.toggle('on', sunShadeMode);
   lSunShade.textContent = sunShadeMode ? 'ON' : 'OFF';
 }
+function applySunShadow(){
+  tSunShadow.classList.toggle('on', sunShadowMode);
+  lSunShadow.textContent = sunShadowMode ? 'ON' : 'OFF';
+}
 function applyWeight(){
   tWeight.classList.toggle('on', weightMode);
   lWeight.textContent = weightMode ? 'ON' : 'OFF';
@@ -192,6 +199,7 @@ tSloth.addEventListener('click', ()=>{ slothMode = !slothMode; applySloth(); });
 tBlurBg.addEventListener('click', ()=>{ blurBgMode = !blurBgMode; applyBlurBg(); });
 tBlurClouds.addEventListener('click', ()=>{ blurCloudsMode = !blurCloudsMode; applyBlurClouds(); });
 tSunShade.addEventListener('click', ()=>{ sunShadeMode = !sunShadeMode; applySunShade(); });
+tSunShadow.addEventListener('click', ()=>{ sunShadowMode = !sunShadowMode; applySunShadow(); });
 tWeight.addEventListener('click', ()=>{ weightMode = !weightMode; applyWeight(); });
 
 // ════════════════════════════════════════════════════════
@@ -4838,6 +4846,42 @@ function drawSunShade(){
   ctx.restore();
 }
 
+// SUN SHADOW — darkens the grass on the side opposite the sun, like a
+// directional cast shadow from the canopy. Weaker at noon (sun overhead
+// → short shadow) and strongest near sunrise/sunset (long raking
+// shadow). Skipped when raining, when SUN SHADE is off, or when the
+// SHADOW sub-toggle is off.
+function drawSunShadow(){
+  if(!sunShadeMode || !sunShadowMode) return;
+  if(rainIntensity > 0.05) return;
+  const sun = getSunPos(dayTime);
+  if(sun.opacity <= 0) return;
+  const sunNx = (sun.x - W * 0.5) / (W * 0.5);     // -1..+1
+  const heightFactor = 1 - Math.min(1, Math.abs(sunNx));
+  // Lower sun (heightFactor near 0) → longer/darker shadow; high sun
+  // → barely any shadow. Cap so it never blows out.
+  const strength = sun.opacity * (0.45 - 0.30 * heightFactor);
+  if(strength <= 0.02) return;
+
+  // Shadow lives on the lower portion (canopy bottom + grass).
+  const grassY = trunkBY * 0.85;
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  if(sunNx < 0){
+    // Sun on left → shadow on right
+    grad.addColorStop(0,   'rgba(0,0,0,0)');
+    grad.addColorStop(0.5, `rgba(20,22,32,${strength * 0.30})`);
+    grad.addColorStop(1,   `rgba(20,22,32,${strength})`);
+  } else {
+    grad.addColorStop(0,   `rgba(20,22,32,${strength})`);
+    grad.addColorStop(0.5, `rgba(20,22,32,${strength * 0.30})`);
+    grad.addColorStop(1,   'rgba(0,0,0,0)');
+  }
+  ctx.save();
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, grassY, W, H - grassY);
+  ctx.restore();
+}
+
 // Score HUD — number only, left-anchored just to the right of the hearts.
 function drawScoreHUD(){
   ctx.save();
@@ -5682,8 +5726,10 @@ function frame(ts){
     ctx.fillRect(0, 0, W, H);
   }
   // Sun-position shade — directional warm/cool soft-light over the
-  // foreground. Skipped when rainy or toggled off.
+  // foreground. Skipped when rainy or toggled off. Cast shadow on the
+  // grass falls right after, on the side opposite the sun.
   drawSunShade();
+  drawSunShadow();
   // Season scene tints (summer golden wash, autumn warm wash, winter
   // white/blue wash).
   if(seasonsMode){
