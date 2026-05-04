@@ -6,12 +6,14 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Open
 
-- [ ] [GitHub Pages — manual one-time setup](.claude/plans/github-pages-manual-setup.md)
-  — Pages source, default branch, and `github-pages` environment
-  protection. Maintainer-only; no API tools available in-session.
+_(none)_
 
 ## Shipped
 
+- [x] **Cache-bust CSS/JS/audio URLs with `?v=<SHA>` injected by deploy workflow**
+- [x] [GitHub Pages — manual one-time setup](.claude/plans/github-pages-manual-setup.md)
+  — Pages source, default branch, and `github-pages` environment
+  protection were flipped by the maintainer.
 - [x] **Top HUD: month/survival bar 2× wider; full month name when it fits**
 - [x] **SUN SHADOW sub-toggle — directional cast shadow on the grass**
 - [x] **Version stamp at top of settings panel (deploy workflow injects build/date/SHA)**

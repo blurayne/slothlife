@@ -34,6 +34,13 @@ jobs:
           window.APP_DATE    = '$(date -u +%Y-%m-%dT%H:%M:%SZ)';
           window.APP_SHA     = '${{ github.sha }}';
           EOF
+      - name: Cache-bust HTML asset URLs
+        run: |
+          # Replace the ?v=dev cache-bust placeholder on every <link>/<script>
+          # in index.html with the current commit SHA so browsers reload the
+          # CSS/JS on each deploy. Audio fetched in JS uses window.APP_SHA
+          # (set by the stamp step above) for the same purpose.
+          sed -i "s/?v=dev/?v=${{ github.sha }}/g" index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

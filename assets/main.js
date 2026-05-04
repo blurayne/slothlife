@@ -317,7 +317,7 @@ const Audio = {
     this._musicLoadingUrl = track.url;
     const ctx = this.ctx;
     const url = track.url;
-    fetch(url)
+    fetch(url + '?v=' + (window.APP_SHA || 'dev'))
       .then(r => {
         if(!r.ok) throw new Error('HTTP ' + r.status);
         return r.arrayBuffer();
@@ -532,7 +532,7 @@ const Audio = {
 
     this._snoreLoading = true;
     // Fetch the snore sample → ArrayBuffer → AudioBuffer.
-    fetch(this._snoreSampleUrl)
+    fetch(this._snoreSampleUrl + '?v=' + (window.APP_SHA || 'dev'))
       .then(r => {
         if(!r.ok) throw new Error('HTTP ' + r.status);
         return r.arrayBuffer();
@@ -651,7 +651,7 @@ const Audio = {
     if(!this.ctx || this._thunderBuffer || this._thunderLoading) return;
     const ctx = this.ctx;
     this._thunderLoading = true;
-    fetch(this._thunderSampleUrl)
+    fetch(this._thunderSampleUrl + '?v=' + (window.APP_SHA || 'dev'))
       .then(r => {
         if(!r.ok) throw new Error('HTTP ' + r.status);
         return r.arrayBuffer();
