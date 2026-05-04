@@ -1727,6 +1727,16 @@ class Sloth{
     this.eatTarget = null;        // {kind:'leaf'|'apple', branch?, fruit?, x, y}
     this.eatProgress = 0;         // 0..1 chew animation
     this.mouthChewT = 0;          // seconds remaining of mouth chew animation
+    this.killHoldT  = 0;          // 0..3 seconds of finger-hold blackening
+  }
+
+  // Hit-test for the tap-and-hold-to-kill gesture. Generous circle that
+  // covers head + body around the smoothed display position.
+  isHitByTap(wx, wy){
+    if(!this.alive || this.charred) return false;
+    const dx = wx - this.displayX;
+    const dy = wy - (this.displayY - 12);
+    return dx*dx + dy*dy <= 36*36;
   }
 
   // Backwards-compat accessors (used by Branch.update for sloth-weight calc)
@@ -2438,6 +2448,14 @@ _eat(dt){
           ctx.fill();
         }
       }
+    } else if(this.killHoldT > 0){
+      // Tap-and-hold-to-kill blackening — same source-atop trick as the
+      // charred overlay, but partial so the user sees the sloth darken
+      // gradually toward the 3-second death threshold.
+      const k = Math.min(1, this.killHoldT / 3) * 0.85;
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = `rgba(10,8,6,${k})`;
+      ctx.fillRect(-2000, -2000, 4000, 4000);
     }
     ctx.restore();
   }
@@ -3356,6 +3374,12 @@ let panLastX = 0;
 let panLastT = 0;
 const PAN_DRAG_THRESHOLD = 6; // px before we commit to "panning"
 let pendingTap = null;        // {x, y} stored on pointerdown; played on click
+// Tap-and-hold to kill the sloth. Holding for KILL_HOLD_S seconds turns
+// the sloth fully black and triggers _die(); moving the finger more
+// than KILL_CANCEL_DIST aborts.
+let killHold = null;          // { pointerId, startWX, startWY }
+const KILL_HOLD_S = 3.0;
+const KILL_CANCEL_DIST = 30;
 
 canvas.addEventListener('pointerdown', e=>{
   // Ignore canvas input while a UI overlay is up (start, name, end)
@@ -3380,6 +3404,20 @@ canvas.addEventListener('pointerdown', e=>{
   panStartX = cx;  panStartY = cy;
   panStartOffset = sceneOffsetX;
   panLastX = cx;   panLastT = performance.now();
+  // Tap-and-hold on the sloth → start a kill-hold gesture. Pre-empts
+  // the normal tap pipeline so a quick release won't fire a swing tap
+  // either; the cancel handler below resets killHoldT to 0.
+  if(cy < trunkBY && sloth && sloth.alive && !sloth.charred){
+    const wx = canvasToWorldX(cx);
+    if(sloth.isHitByTap(wx, cy)){
+      killHold = { pointerId: e.pointerId, startWX: wx, startWY: cy };
+      sloth.killHoldT = 0.001;
+      pendingTap = null;
+      isPanning = false;
+      canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+  }
   // Grass area = below trunkBY. Swipes there scroll the scene.
   if(cy >= trunkBY){
     isPanning = true;
@@ -3395,6 +3433,15 @@ canvas.addEventListener('pointerdown', e=>{
 
 canvas.addEventListener('pointermove', e=>{
   const {x: cx, y: cy} = getCanvasXY(e);
+  // Cancel an in-progress kill-hold if the finger drifts too far.
+  if(killHold && e.pointerId === killHold.pointerId){
+    const wx = canvasToWorldX(cx);
+    if(Math.hypot(wx - killHold.startWX, cy - killHold.startWY) > KILL_CANCEL_DIST){
+      killHold = null;
+      if(sloth) sloth.killHoldT = 0;
+    }
+    return;
+  }
   const dx = cx - panStartX;
   const dy = cy - panStartY;
   // If the pointer moves far horizontally before lifting, treat it as a
@@ -3415,6 +3462,13 @@ canvas.addEventListener('pointermove', e=>{
 });
 
 function _endPan(e){
+  // Released before the kill-hold completed — clear the gesture and the
+  // visible blackening, no normal tap follows.
+  if(killHold && (!e || e.pointerId === killHold.pointerId)){
+    killHold = null;
+    if(sloth && sloth.alive) sloth.killHoldT = 0;
+    return;
+  }
   if(isPanning){
     isPanning = false;
     return;   // no tap after a drag
@@ -3432,7 +3486,14 @@ function _endPan(e){
   __runTapLogic(x, y);
 }
 canvas.addEventListener('pointerup',     _endPan);
-canvas.addEventListener('pointercancel', e=>{ isPanning=false; pendingTap=null; });
+canvas.addEventListener('pointercancel', e=>{
+  isPanning = false;
+  pendingTap = null;
+  if(killHold && e.pointerId === killHold.pointerId){
+    killHold = null;
+    if(sloth) sloth.killHoldT = 0;
+  }
+});
 
 // Original tap resolution logic, factored out so swipe vs tap can both call it.
 function __runTapLogic(x, y){
@@ -5455,6 +5516,16 @@ function frame(ts){
     slothPending=false;
   }
   if(sloth) sloth.update(dt);
+  // Tap-and-hold-to-kill timer. Ticks only while a finger is actively
+  // pressing on the sloth (managed by the pointer handlers above).
+  if(killHold && sloth && sloth.alive && !sloth.charred && !paused){
+    sloth.killHoldT += dt;
+    if(sloth.killHoldT >= KILL_HOLD_S){
+      killHold = null;
+      sloth.killHoldT = KILL_HOLD_S;
+      sloth._die();
+    }
+  }
 
   // Fruits + falling-leaves entities
   if(fruitsMode){

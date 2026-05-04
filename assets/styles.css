@@ -216,6 +216,15 @@
   .ov-rules .leaf{color:#9CE85B;font-weight:bold}
   .ov-rules .heart{color:#E62832;font-weight:bold}
 
+  .ov-tip{
+    margin-top:12px;
+    padding:8px 10px;
+    background:rgba(255,200,80,0.06);
+    border-left:3px solid #FFE678;
+    font-size:12px;line-height:1.45;
+    color:#FFE678;letter-spacing:.04em;
+  }
+
   .ov-btn{
     display:block;width:100%;
     margin-top:14px;
