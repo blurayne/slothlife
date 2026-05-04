@@ -31,7 +31,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # checkout@v5 is the first major that natively targets Node 24,
+      # so this one drops out of the "forced to Node 24" warning list.
+      # configure-pages / upload-pages-artifact / deploy-pages have no
+      # Node-24-native major yet (as of late-2025); the workflow-level
+      # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 keeps them working under
+      # Node 24 with an informational notice that lists them.
+      - uses: actions/checkout@v5
       - uses: actions/configure-pages@v5
       - name: Stamp version.js
         run: |
