@@ -42,7 +42,7 @@ const P = {
   month:       3,    // 0..12 (Jan..Dec); 3.0 = April (game start)
   appleCount:  0.10,
   branchLen:   0.8,
-  grass:       1.0,
+  grass:       1.75,
   dayPace:     1.0,
   hungerPace:  2.0,
   weightMult:  1.0,
@@ -1475,7 +1475,9 @@ function makeGrassBlades(){
     const tilt   = (Math.random() - 0.5) * 0.55;
     const flex   = 0.35 + Math.random() * 0.85;
     const tint   = Math.random();
-    const h      = (5 + Math.random()*14) * (0.55 + depth01 * 0.95);
+    // Slightly taller blades (was (5 + 14·rand) · …) so the grass field
+    // reads more lushly without changing the spawn distribution.
+    const h      = (6 + Math.random()*18) * (0.55 + depth01 * 0.95);
     const width  = 1.2 + depth01 * 1.2;
     const x      = Math.random() * W;
     const y      = trunkBY + 1 + yOff;
