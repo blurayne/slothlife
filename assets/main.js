@@ -2456,14 +2456,6 @@ _eat(dt){
           ctx.fill();
         }
       }
-    } else if(this.killHoldT > 0){
-      // Tap-and-hold-to-kill blackening — same source-atop trick as the
-      // charred overlay, but partial so the user sees the sloth darken
-      // gradually toward the 3-second death threshold.
-      const k = Math.min(1, this.killHoldT / 3) * 0.85;
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = `rgba(10,8,6,${k})`;
-      ctx.fillRect(-2000, -2000, 4000, 4000);
     }
     ctx.restore();
   }
@@ -4096,15 +4088,15 @@ function updateLightning(dt){
   }
 }
 
-function _spawnLightning(){
-  // Decide if THIS strike hits the sloth — very rare.
-  // Roughly 3% of strikes; needs the sloth to actually exist + be vulnerable.
+function _spawnLightning(forceHitSloth = false){
+  // Decide if THIS strike hits the sloth — very rare in normal play,
+  // forced when the player kills the sloth via the tap-and-hold gesture.
   const slothHittable = sloth && sloth.alive && (
     sloth.state === 'HANGING' || sloth.state === 'WINDUP' ||
     sloth.state === 'REACHING' || sloth.state === 'TRANSITION' ||
     sloth.state === 'EATING' || sloth.state === 'SLEEPING'
   );
-  const hitSloth = slothHittable && (Math.random() < 0.05);
+  const hitSloth = slothHittable && (forceHitSloth || (Math.random() < 0.05));
 
   // Strike point
   const tx = hitSloth ? sloth.bodyX : (Math.random() * W * 1.3 - W * 0.15);
@@ -4830,64 +4822,6 @@ function drawSunShade(){
   }
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
-  ctx.restore();
-}
-
-// Death overlay — fades a skull glyph in over the canvas and applies
-// a CSS `saturate()` filter so the whole scene desaturates while the
-// player tap-and-holds the sloth toward death. Both effects are driven
-// by sloth.killHoldT (0..KILL_HOLD_S). Cleared once the kill triggers
-// (sloth.charred = true) or the user releases (killHoldT reset to 0).
-function drawKillOverlay(){
-  const k = (sloth && sloth.alive && !sloth.charred && sloth.killHoldT > 0)
-    ? Math.min(1, sloth.killHoldT / KILL_HOLD_S)
-    : 0;
-  // Touch the canvas filter only when the value would actually change.
-  const desired = k > 0 ? `saturate(${(1 - k * 0.85).toFixed(3)})` : '';
-  if(canvas.style.filter !== desired) canvas.style.filter = desired;
-  if(k <= 0) return;
-
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = k;
-  const cx = W * 0.5, cy = H * 0.5;
-  const sz = Math.min(W, H) * 0.32;
-  // Cranium + jaw — pale off-white with a soft dark shadow so the
-  // skull stays legible on bright skies.
-  ctx.shadowColor = 'rgba(0,0,0,0.55)';
-  ctx.shadowBlur  = 18;
-  ctx.fillStyle   = 'rgba(245,245,245,0.92)';
-  ctx.beginPath();
-  ctx.arc(cx, cy - sz * 0.05, sz * 0.45, 0, PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx - sz * 0.30, cy + sz * 0.18);
-  ctx.lineTo(cx - sz * 0.34, cy + sz * 0.45);
-  ctx.lineTo(cx + sz * 0.34, cy + sz * 0.45);
-  ctx.lineTo(cx + sz * 0.30, cy + sz * 0.18);
-  ctx.closePath();
-  ctx.fill();
-  // Eye sockets, nose, teeth — pure black for the cut-out look.
-  ctx.shadowBlur = 0;
-  ctx.fillStyle  = '#000';
-  ctx.beginPath();
-  ctx.arc(cx - sz * 0.18, cy - sz * 0.04, sz * 0.10, 0, PI * 2);
-  ctx.arc(cx + sz * 0.18, cy - sz * 0.04, sz * 0.10, 0, PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx,             cy + sz * 0.05);
-  ctx.lineTo(cx - sz * 0.06, cy + sz * 0.18);
-  ctx.lineTo(cx + sz * 0.06, cy + sz * 0.18);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth   = sz * 0.025;
-  for(let i = -2; i <= 2; i++){
-    ctx.beginPath();
-    ctx.moveTo(cx + i * sz * 0.10, cy + sz * 0.22);
-    ctx.lineTo(cx + i * sz * 0.10, cy + sz * 0.42);
-    ctx.stroke();
-  }
   ctx.restore();
 }
 
@@ -5642,13 +5576,23 @@ function frame(ts){
   // pressing on the sloth (managed by the pointer handlers above).
   if(killHold && sloth && sloth.alive && !sloth.charred && !paused){
     sloth.killHoldT += dt;
+    // Ramp the rain up while the player holds — the approaching storm
+    // telegraphs the impending strike. Only ratchets up; we never lower
+    // the existing intensity so we don't fight an already-raging storm.
+    const k = Math.min(1, sloth.killHoldT / KILL_HOLD_S);
+    const ramp = 0.95 * k;
+    if(rainTargetIntensity < ramp) rainTargetIntensity = ramp;
+    if(rainIntensity < ramp * 0.85) rainIntensity = ramp * 0.85;
     if(sloth.killHoldT >= KILL_HOLD_S){
       killHold = null;
       sloth.killHoldT = KILL_HOLD_S;
-      // Turn fully black + drop limp from the tree. The existing fall
-      // path will eventually call _die() on landing (decrementing lives
-      // and respawning, or ending the game on the third death).
-      sloth.charByLightning();
+      // Lock heavy rain + thunder, then strike the sloth directly.
+      // _spawnLightning(true) force-hits the sloth and calls
+      // sloth.charByLightning() which chars + drops it limp from the
+      // tree; the fall path eventually calls _die() on landing.
+      rainTargetIntensity = 0.95 + Math.random() * 0.05;
+      rainHasThunder = true;
+      _spawnLightning(true);
     }
   }
 
@@ -5828,7 +5772,6 @@ function frame(ts){
   drawScoreHUD();
   drawLivesHUD();
   drawGameOverHUD();
-  drawKillOverlay();
 
   wfill.style.width=(Wind.str*100).toFixed(0)+'%';
   // PAUSED overlay — drawn last so it sits over all canvas content.

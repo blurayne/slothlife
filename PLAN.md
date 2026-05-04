@@ -12,6 +12,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped
 
+- [x] **Kill-by-hold = thunderstorm + lightning strike (replaces skull/desat overlay)**
 - [x] **Brighter settings panel text (alpha bumps for readability)**
 - [x] **Bug fix: cap rain+night dim overlay so the tree stays visible in heavy storms at night**
 - [x] **Sun-position shade on the foreground (toggleable, off in rain)**
