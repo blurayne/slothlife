@@ -312,7 +312,7 @@ const Audio = {
     { name: 'Canopy Drift',   url: 'assets/audio/canopy-drift.mp3'   },
     { name: 'Selva Lenta II', url: 'assets/audio/selva-lenta-ii.mp3' },
   ],
-  _musicIndex: -1,                           // -1 → pick random on first use
+  _musicIndex: 0,                            // start always with Mossy Perch (track 0)
   _musicBuffers: Object.create(null),        // url → AudioBuffer cache
   _musicLoadingUrl: null,                    // URL of fetch currently in flight
   _musicSource: null,
@@ -320,7 +320,7 @@ const Audio = {
   _musicWanted: false,                       // intent: should music be playing?
   currentTrack(){
     if(this._musicIndex < 0 || this._musicIndex >= this._musicTracks.length){
-      this._musicIndex = Math.floor(Math.random() * this._musicTracks.length);
+      this._musicIndex = 0;                 // safety fallback to Mossy Perch
     }
     return this._musicTracks[this._musicIndex];
   },
