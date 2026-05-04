@@ -2893,8 +2893,20 @@ class Fruit{
     this.r=5.5+Math.random()*2.2;
     this.holdStrength=0.40+Math.random()*0.40;
     this.alive=true;
-    const v=Math.random();
-    this.color = v<0.55 ? '#C8392E' : (v<0.85 ? '#D54F38' : '#A93026');
+    // Apples in shades of red, orange, amber, and yellow — palette weighted
+    // toward red so the orchard still reads as red-apple country.
+    const APPLE_COLORS = [
+      // reds (×8)
+      '#A93026', '#B8362A', '#BD3520', '#C03A22',
+      '#C8392E', '#D03828', '#D5402F', '#D54F38',
+      // oranges (×4)
+      '#C5552A', '#D26830', '#DA723A', '#E07A2A',
+      // amber (×3)
+      '#E08828', '#E5A626', '#E89A1E',
+      // yellow (×1)
+      '#F0C020',
+    ];
+    this.color = APPLE_COLORS[(Math.random() * APPLE_COLORS.length) | 0];
     this.swayPhase=Math.random()*PI*2;
   }
   detach(extraImpulse=0){

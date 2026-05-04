@@ -12,6 +12,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped
 
+- [x] **Apple colour palette: random reds, oranges, amber, and yellow**
 - [x] **Tap-and-hold to kill the sloth + start-screen game-length tip**
   — long-press the sloth to blacken it; 3 s ⇒ death. Bold yellow tip
   on the start screen surfaces the ~45 min / 30-month run length.
