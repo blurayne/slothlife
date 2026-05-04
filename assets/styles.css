@@ -296,8 +296,23 @@
   .ov-final .big{color:#FFE678;font-size:22px;font-weight:bold}
   .ov-final .bonus{color:#FFC2A8;font-size:11px;margin-top:4px}
 
+  .ov-repo{
+    margin-top:12px;
+    text-align:center;
+    font:11px 'Courier New',monospace;
+    letter-spacing:.05em;
+  }
+  .ov-repo a{
+    color:rgba(160,200,255,.75);
+    text-decoration:none;
+    border-bottom:1px dotted rgba(160,200,255,.40);
+  }
+  .ov-repo a:hover{
+    color:#fff;
+    border-bottom-color:#fff;
+  }
   .ov-version{
-    margin-top:14px;
+    margin-top:6px;
     text-align:center;
     font:9px 'Courier New',monospace;
     color:rgba(220,235,255,.45);
