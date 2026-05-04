@@ -76,7 +76,9 @@ const sliderDefs = [
   { id:'hungerPace',  fmt: v => v.toFixed(1) + 'x' },
   { id:'weightMult',  fmt: v => v.toFixed(1) + 'x' },
   { id:'endMonths',   fmt: v => v.toFixed(0) },
-  { id:'grass',       fmt: v => v.toFixed(2) + 'x', onChange: 'grass' }
+  { id:'grass',       fmt: v => v.toFixed(2) + 'x', onChange: 'grass' },
+  { id:'musicVol',    fmt: v => Math.round(v * 100) + '%', onChange: 'musicVol' },
+  { id:'fxVol',       fmt: v => Math.round(v * 100) + '%', onChange: 'fxVol' }
 ];
 sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
   const el  = document.getElementById('s-'+id);
@@ -89,6 +91,8 @@ sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
     if(onChange === 'time') dayTime = P.time;
     if(onChange === 'month'){ seasonTime = P.month / 12; }
     if(onChange === 'grass'){ makeGrassBlades(); }
+    if(onChange === 'musicVol'){ Audio.applyVolumes(); }
+    if(onChange === 'fxVol'){ Audio.applyVolumes(); }
   });
 });
 
@@ -835,6 +839,22 @@ window.addEventListener('keydown', e => {
     }
   }
 });
+
+// TRACK selector — show the current soundtrack name and let the user
+// cycle to the next one. Audio.currentTrack() also resolves the
+// default starting track (Mossy Perch) on first call.
+const bTrack = document.getElementById('b-track');
+const vTrack = document.getElementById('v-track');
+function refreshTrackLabel(){
+  if(vTrack) vTrack.textContent = Audio.currentTrack().name;
+}
+refreshTrackLabel();
+if(bTrack){
+  bTrack.addEventListener('click', () => {
+    Audio.nextTrack();
+    refreshTrackLabel();
+  });
+}
 
 // Bottom-right icon buttons: sound on/off + fullscreen on/off.
 const icSound = document.getElementById('ic-sound');
