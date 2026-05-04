@@ -6,7 +6,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Open
 
-_(none)_
+- [ ] [Two-finger pinch zoom (toggleable, default off)](.claude/plans/two-finger-zoom.md)
 
 ## Shipped
 
