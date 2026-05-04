@@ -4884,19 +4884,20 @@ function drawSurvivalBar(){
     ctx.fillRect(tx - 0.5, y + 1, 1, h - 2);
   }
 
-  // Centered label inside the bar — month name only.
-  // Hidden when seasons are off (no calendar context to display) or
-  // when the bar is too narrow.
-  if(seasonsMode && w >= 60){
+  // Month label centered on the bar — always shown so the player can
+  // read the calendar at a glance regardless of seasons mode or bar
+  // width. Uses the 3-letter MONTH_NAMES form so it fits even on
+  // narrow bars on small screens.
+  {
     ctx.save();
     ctx.font = `bold ${Math.round(9 * HUD_SCALE)}px "Courier New", monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const monthIdx = Math.floor(seasonTime * 12) % 12;
-    const label = MONTH_NAMES_FULL[((monthIdx % 12) + 12) % 12];
+    const monthIdx = ((Math.floor(seasonTime * 12) % 12) + 12) % 12;
+    const label = MONTH_NAMES[monthIdx];
     const cx = x + w * 0.5;
     const cy = y + h * 0.5 + 0.5;
-    // Half-width outline for legibility against varying bar fill colours.
+    // Outline for legibility against varying bar fill colours.
     ctx.lineWidth = 1.1 * HUD_SCALE;
     ctx.strokeStyle = 'rgba(0,0,0,0.70)';
     ctx.strokeText(label, cx, cy);
