@@ -169,7 +169,7 @@
 
   /* Help hint shown briefly on first load */
   #hint{
-    position:fixed;top:24px;left:50%;transform:translateX(-50%);
+    position:fixed;top:10vh;left:50%;transform:translateX(-50%);
     font:11px 'Courier New',monospace;color:rgba(255,255,255,.40);
     letter-spacing:.12em;pointer-events:none;
     background:rgba(6,12,20,.55);padding:7px 14px;border-radius:4px;
