@@ -188,6 +188,43 @@ applyPanelState();
   }
 }
 
+// RESTART button — close the panel, drop the current run, and put the
+// player back on the start screen (instead of beginning a new run
+// straight away, the way restartGame() does after a game-over). The
+// resets here mirror restartGame()'s state-only steps and skip the
+// `spawnSloth()` call so the start screen owns the next play.
+{
+  const bRestartBtn = document.getElementById('b-restart');
+  if(bRestartBtn){
+    bRestartBtn.addEventListener('click', () => {
+      panelOpen = false;
+      applyPanelState();
+      gameOver       = false;
+      didWin         = false;
+      _endReason     = '';
+      livesBonusGiven = 0;
+      lives          = MAX_LIVES;
+      score          = 0;
+      hunger         = 0.80;
+      displayedHunger = 0.80;
+      gameDaysElapsed = 0;
+      _lastYearMark  = 0;
+      _lastMonthMark = 0;
+      sloth          = null;
+      slothPending   = false;
+      fruits         = [];
+      fallingLeaves  = [];
+      // Reset camera too so the start screen lays over a centred world.
+      worldZoom    = 1.0;
+      sceneOffsetY = 0;
+      panVelX = 0; panVelY = 0;
+      pinch = null;
+      activePointers.clear();
+      showStart();
+    });
+  }
+}
+
 // ════════════════════════════════════════════════════════
 //  FEATURE TOGGLES (Pixelize, Sloth)
 // ════════════════════════════════════════════════════════
