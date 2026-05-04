@@ -47,7 +47,7 @@ const P = {
   hungerPace:  2.0,
   weightMult:  1.0,
   endMonths:   30,
-  musicVol:    0.88,
+  musicVol:    0.75,
   fxVol:       0.57,
 };
 
