@@ -2597,8 +2597,25 @@ _eat(dt){
   }
 
   _drawReachFX(){
-    const tp   = getBranchPt(this.reachTarget.branch, this.reachTarget.t);
-    const dist = Math.hypot(tp.x - this.bodyX, tp.y - this.bodyY);
+    // When the reach is for a fruit (or a leaf), centre the marker on
+    // the fruit/leaf itself rather than the branch attachment point —
+    // the player tapped the food, the marker should land on the food.
+    let tx, ty;
+    const et = this.eatTarget;
+    if(et && et.kind === 'apple' && et.fruit && et.fruit.alive !== false){
+      tx = et.fruit.x; ty = et.fruit.y;
+    } else if(et && et.kind === 'leaf' && et.branch && et.branch.leafSeed){
+      const idx = (typeof et.leafIdx === 'number')
+        ? Math.max(0, Math.min(et.branch.leafSeed.length - 1, et.leafIdx))
+        : 0;
+      const lf = et.branch.leafSeed[idx];
+      if(lf){ tx = et.branch.ex + lf.ox; ty = et.branch.ey + lf.oy; }
+    }
+    if(tx === undefined){
+      const tp = getBranchPt(this.reachTarget.branch, this.reachTarget.t);
+      tx = tp.x; ty = tp.y;
+    }
+    const dist = Math.hypot(tx - this.bodyX, ty - this.bodyY);
     const maxR = this._limbMaxReach(this.activeLimbs[0]) * P.armReach + this.BW;
     const ok   = dist <= maxR;
     const pulse = 0.5 + 0.5 * sin(this.idleT * 7);
@@ -2608,18 +2625,18 @@ _eat(dt){
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
     ctx.moveTo(this.bodyX, this.bodyY - this.BH * 0.5);
-    ctx.lineTo(tp.x, tp.y);
+    ctx.lineTo(tx, ty);
     ctx.strokeStyle = `rgba(${colBase},0.55)`;
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
     // Outer pulsing ring
-    ctx.beginPath(); ctx.arc(tp.x, tp.y, 7 + pulse * 6, 0, PI*2);
+    ctx.beginPath(); ctx.arc(tx, ty, 7 + pulse * 6, 0, PI*2);
     ctx.strokeStyle = `rgba(${colBase},${0.5 + pulse*0.4})`;
     ctx.lineWidth = 2.2;
     ctx.stroke();
     // Inner solid dot for clarity
-    ctx.beginPath(); ctx.arc(tp.x, tp.y, 2.5, 0, PI*2);
+    ctx.beginPath(); ctx.arc(tx, ty, 2.5, 0, PI*2);
     ctx.fillStyle = `rgba(${colBase},0.9)`;
     ctx.fill();
   }
