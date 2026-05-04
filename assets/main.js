@@ -105,6 +105,7 @@ let panelOpen = false;   // start collapsed
 function applyPanelState(){
   panel.classList.toggle('hidden', !panelOpen);
   icSettings.classList.toggle('active', panelOpen);
+  document.body.classList.toggle('panel-open', panelOpen);
 }
 icSettings.addEventListener('click', (e)=>{
   e.stopPropagation();   // don't let the document handler immediately close it

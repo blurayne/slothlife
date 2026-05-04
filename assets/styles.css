@@ -24,7 +24,7 @@
     display:flex;align-items:center;justify-content:center;
     cursor:pointer;outline:none;
     color:rgba(195,222,255,.65);
-    transition:color .15s,border-color .15s,background .15s;
+    transition:color .15s,border-color .15s,background .15s,opacity .18s;
     z-index:11;
     padding:0;
   }
@@ -46,14 +46,21 @@
   .icon-btn.mode-full .icon-full { display:block; }
   .icon-btn.mode-fx   .icon-fx   { display:block; }
   .icon-btn.mode-off  .icon-mute { display:block; }
-  #ic-settings { right:114px; }
+  #ic-full     { right:114px; }
   #ic-sound    { right:66px;  }
-  #ic-full     { right:18px;  }
+  #ic-settings { right:18px;  }
   /* Brighten the settings cog while the panel is open. */
   #ic-settings.active{
     color:rgba(255,255,255,.95);
     border-color:rgba(255,255,255,.22);
     background:rgba(12,28,50,.90);
+  }
+  /* While the settings panel is open, fade out the other bottom-bar
+     icons (sound, fullscreen) so the panel feels modal. The gear stays
+     visible and clickable so the user can close the panel. */
+  body.panel-open .icon-btn:not(#ic-settings){
+    opacity:0;
+    pointer-events:none;
   }
 
   /* PANEL — slides in from right edge */
