@@ -3934,7 +3934,12 @@ function updateRain(dt){
   // falling out so a winter onset doesn't leave drops frozen mid-air.
   if(rainIntensity > 0.02 && snowing < 0.5){
     const windPush = Wind.sample(0.6);                  // ±~1
-    const spawnRate = rainIntensity * 280;              // was 90
+    // Heavy rain feels heavier two ways: drops fall up to 3x faster,
+    // and the spawn rate also scales with that multiplier so the on-
+    // screen drop density grows (faster falls would otherwise empty
+    // the screen at constant spawn rate).
+    const speedMul  = 1 + 2 * rainIntensity;            // 1x → 3x linear
+    const spawnRate = rainIntensity * 380 * speedMul;   // was rainIntensity * 280
     let toSpawn = spawnRate * dt;
     const baseVx = windPush * 360 + 20;                  // wind drives slant
     while(toSpawn > 0){
@@ -3943,7 +3948,7 @@ function updateRain(dt){
           x: Math.random()*(W*1.6) - W*0.3,
           y: -20,
           vx: baseVx + (Math.random() - 0.5) * 60,
-          vy: 720 + Math.random()*260,
+          vy: (720 + Math.random()*260) * speedMul,
           near: Math.random() < 0.35,
         });
       }

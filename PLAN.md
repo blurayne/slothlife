@@ -12,6 +12,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped
 
+- [x] **Heavier rain: more drops, fall speed up to 3× via `1 + 2·intensity`**
 - [x] **Tap-to-kill drops the sloth + skull overlay & desaturation while holding**
 - [x] **Apple colour palette: random reds, oranges, amber, and yellow**
 - [x] **Tap-and-hold to kill the sloth + start-screen game-length tip**
