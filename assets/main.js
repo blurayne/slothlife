@@ -136,6 +136,32 @@ applyPanelState();
   });
 }
 
+// REFRESH button — unregister the service worker, drop every cache,
+// then navigate to the page with a fresh ?refresh=<ts> so the request
+// is unambiguously a new cache key. Belt-and-suspenders against the
+// GitHub Pages 10-min HTML cache.
+{
+  const bRefresh = document.getElementById('b-refresh');
+  if(bRefresh){
+    bRefresh.addEventListener('click', async () => {
+      bRefresh.disabled = true;
+      try {
+        if('serviceWorker' in navigator){
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        if('caches' in window){
+          const names = await caches.keys();
+          await Promise.all(names.map((n) => caches.delete(n)));
+        }
+      } catch(e){ console.warn('Refresh cleanup failed:', e); }
+      const url = new URL(location.href);
+      url.searchParams.set('refresh', Date.now().toString(36));
+      location.href = url.toString();
+    });
+  }
+}
+
 // ════════════════════════════════════════════════════════
 //  FEATURE TOGGLES (Pixelize, Sloth)
 // ════════════════════════════════════════════════════════
