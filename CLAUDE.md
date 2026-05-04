@@ -2,8 +2,11 @@
 
 ## Commits
 
-- **Commit after every development step.** Don't batch unrelated
-  changes into one commit; one logical change per commit.
+- **Commit after every development step or completed plan, before
+  starting the next.** Don't carry uncommitted work across tasks and
+  don't batch unrelated changes — one logical change per commit. If a
+  plan in `PLAN.md` covers several logical changes, ship and commit
+  each one individually instead of batching them at the end.
 - **Commit directly to `main`.** Pushes to `main` automatically
   build and deploy to GitHub Pages via
   `.github/workflows/deploy-pages.yml`.
