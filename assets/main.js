@@ -133,6 +133,8 @@ const tBlurBg     = document.getElementById('t-blurbg');
 const lBlurBg     = document.getElementById('l-blurbg');
 const tBlurClouds = document.getElementById('t-blurclouds');
 const lBlurClouds = document.getElementById('l-blurclouds');
+const tSunShade   = document.getElementById('t-sunshade');
+const lSunShade   = document.getElementById('l-sunshade');
 const tWeight     = document.getElementById('t-weight');
 const lWeight     = document.getElementById('l-weight');
 const scanlines   = document.getElementById('scanlines');
@@ -141,6 +143,7 @@ let pixelMode = false;
 let slothMode = true;
 let blurBgMode = true;
 let blurCloudsMode = false;
+let sunShadeMode = true;
 let weightMode = true;
 
 function applyPixel(){
@@ -163,6 +166,10 @@ function applyBlurClouds(){
   tBlurClouds.classList.toggle('on', blurCloudsMode);
   lBlurClouds.textContent = blurCloudsMode ? 'ON' : 'OFF';
 }
+function applySunShade(){
+  tSunShade.classList.toggle('on', sunShadeMode);
+  lSunShade.textContent = sunShadeMode ? 'ON' : 'OFF';
+}
 function applyWeight(){
   tWeight.classList.toggle('on', weightMode);
   lWeight.textContent = weightMode ? 'ON' : 'OFF';
@@ -171,6 +178,7 @@ tPixel.addEventListener('click', ()=>{ pixelMode = !pixelMode; applyPixel(); });
 tSloth.addEventListener('click', ()=>{ slothMode = !slothMode; applySloth(); });
 tBlurBg.addEventListener('click', ()=>{ blurBgMode = !blurBgMode; applyBlurBg(); });
 tBlurClouds.addEventListener('click', ()=>{ blurCloudsMode = !blurCloudsMode; applyBlurClouds(); });
+tSunShade.addEventListener('click', ()=>{ sunShadeMode = !sunShadeMode; applySunShade(); });
 tWeight.addEventListener('click', ()=>{ weightMode = !weightMode; applyWeight(); });
 
 // ════════════════════════════════════════════════════════
@@ -4787,6 +4795,43 @@ function restartGame(){
   bellyScale = 1.0;
 }
 
+// SUN SHADE — directional warm-light / cool-shadow gradient driven by
+// the sun's screen position. Applied with `soft-light` so it gently
+// brightens the side facing the sun and darkens the opposite side
+// without crushing colours. Skipped when raining (no shafts of light
+// through clouds) or when the SUN SHADE toggle is off.
+function drawSunShade(){
+  if(!sunShadeMode) return;
+  if(rainIntensity > 0.05) return;
+  const sun = getSunPos(dayTime);
+  if(sun.opacity <= 0) return;
+  // Sun's horizontal screen position normalised to -1..+1.
+  const sunNx = (sun.x - W * 0.5) / (W * 0.5);
+  // Strength tapers off at the horizon (low sun = soft side-light)
+  // and peaks near zenith. sun.opacity already fades the whole effect
+  // around sunrise/sunset.
+  const heightFactor = 1 - Math.min(1, Math.abs(sunNx));
+  const strength = sun.opacity * (0.20 + 0.30 * heightFactor);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'soft-light';
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  if(sunNx < 0){
+    // Sun on the LEFT → warm bright on the left, cool shadow on the right.
+    grad.addColorStop(0,   `rgba(255, 230, 170, ${strength})`);
+    grad.addColorStop(0.5, `rgba(180, 170, 140, ${strength * 0.30})`);
+    grad.addColorStop(1,   `rgba(15, 20, 40,   ${strength * 0.70})`);
+  } else {
+    // Sun on the RIGHT → mirror.
+    grad.addColorStop(0,   `rgba(15, 20, 40,   ${strength * 0.70})`);
+    grad.addColorStop(0.5, `rgba(180, 170, 140, ${strength * 0.30})`);
+    grad.addColorStop(1,   `rgba(255, 230, 170, ${strength})`);
+  }
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  ctx.restore();
+}
+
 // Death overlay — fades a skull glyph in over the canvas and applies
 // a CSS `saturate()` filter so the whole scene desaturates while the
 // player tap-and-holds the sloth toward death. Both effects are driven
@@ -5674,6 +5719,9 @@ function frame(ts){
     ctx.fillStyle = `rgba(${tintR},${tintG},${tintB},${(1 - totalDim) * 0.85})`;
     ctx.fillRect(0, 0, W, H);
   }
+  // Sun-position shade — directional warm/cool soft-light over the
+  // foreground. Skipped when rainy or toggled off.
+  drawSunShade();
   // Season scene tints (summer golden wash, autumn warm wash, winter
   // white/blue wash).
   if(seasonsMode){
