@@ -4782,6 +4782,64 @@ function restartGame(){
   bellyScale = 1.0;
 }
 
+// Death overlay — fades a skull glyph in over the canvas and applies
+// a CSS `saturate()` filter so the whole scene desaturates while the
+// player tap-and-holds the sloth toward death. Both effects are driven
+// by sloth.killHoldT (0..KILL_HOLD_S). Cleared once the kill triggers
+// (sloth.charred = true) or the user releases (killHoldT reset to 0).
+function drawKillOverlay(){
+  const k = (sloth && sloth.alive && !sloth.charred && sloth.killHoldT > 0)
+    ? Math.min(1, sloth.killHoldT / KILL_HOLD_S)
+    : 0;
+  // Touch the canvas filter only when the value would actually change.
+  const desired = k > 0 ? `saturate(${(1 - k * 0.85).toFixed(3)})` : '';
+  if(canvas.style.filter !== desired) canvas.style.filter = desired;
+  if(k <= 0) return;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = k;
+  const cx = W * 0.5, cy = H * 0.5;
+  const sz = Math.min(W, H) * 0.32;
+  // Cranium + jaw — pale off-white with a soft dark shadow so the
+  // skull stays legible on bright skies.
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur  = 18;
+  ctx.fillStyle   = 'rgba(245,245,245,0.92)';
+  ctx.beginPath();
+  ctx.arc(cx, cy - sz * 0.05, sz * 0.45, 0, PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx - sz * 0.30, cy + sz * 0.18);
+  ctx.lineTo(cx - sz * 0.34, cy + sz * 0.45);
+  ctx.lineTo(cx + sz * 0.34, cy + sz * 0.45);
+  ctx.lineTo(cx + sz * 0.30, cy + sz * 0.18);
+  ctx.closePath();
+  ctx.fill();
+  // Eye sockets, nose, teeth — pure black for the cut-out look.
+  ctx.shadowBlur = 0;
+  ctx.fillStyle  = '#000';
+  ctx.beginPath();
+  ctx.arc(cx - sz * 0.18, cy - sz * 0.04, sz * 0.10, 0, PI * 2);
+  ctx.arc(cx + sz * 0.18, cy - sz * 0.04, sz * 0.10, 0, PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx,             cy + sz * 0.05);
+  ctx.lineTo(cx - sz * 0.06, cy + sz * 0.18);
+  ctx.lineTo(cx + sz * 0.06, cy + sz * 0.18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth   = sz * 0.025;
+  for(let i = -2; i <= 2; i++){
+    ctx.beginPath();
+    ctx.moveTo(cx + i * sz * 0.10, cy + sz * 0.22);
+    ctx.lineTo(cx + i * sz * 0.10, cy + sz * 0.42);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // Score HUD — number only, left-anchored just to the right of the hearts.
 function drawScoreHUD(){
   ctx.save();
@@ -5536,7 +5594,10 @@ function frame(ts){
     if(sloth.killHoldT >= KILL_HOLD_S){
       killHold = null;
       sloth.killHoldT = KILL_HOLD_S;
-      sloth._die();
+      // Turn fully black + drop limp from the tree. The existing fall
+      // path will eventually call _die() on landing (decrementing lives
+      // and respawning, or ending the game on the third death).
+      sloth.charByLightning();
     }
   }
 
@@ -5709,6 +5770,7 @@ function frame(ts){
   drawScoreHUD();
   drawLivesHUD();
   drawGameOverHUD();
+  drawKillOverlay();
 
   wfill.style.width=(Wind.str*100).toFixed(0)+'%';
   // PAUSED overlay — drawn last so it sits over all canvas content.
