@@ -911,15 +911,10 @@ function applyRain(){
 }
 tRain.addEventListener('click', ()=>{ rainMode = !rainMode; applyRain(); });
 
-// SEASONS toggle
-const tSeasons = document.getElementById('t-seasons');
-const lSeasons = document.getElementById('l-seasons');
-let seasonsMode = true;
-function applySeasons(){
-  tSeasons.classList.toggle('on', seasonsMode);
-  lSeasons.textContent = seasonsMode ? 'ON' : 'OFF';
-}
-tSeasons.addEventListener('click', ()=>{ seasonsMode = !seasonsMode; applySeasons(); });
+// SEASONS — always on (the panel toggle is gone). Kept as a const so
+// every existing `if(seasonsMode)` gate around the codebase still
+// short-circuits cleanly without touching dozens of call sites.
+const seasonsMode = true;
 
 // SHUFFLE button → randomise background theme
 const bRandomize = document.getElementById('b-randomize');
