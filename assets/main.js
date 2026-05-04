@@ -122,6 +122,19 @@ document.addEventListener('click', (e)=>{
 });
 applyPanelState();
 
+// Stamp the panel header with the version info baked into version.js
+// (defaults to dev/local/unknown; the Pages workflow rewrites the file
+// before deploy with the real version, build #, ISO date, and SHA).
+{
+  const verEl = document.getElementById('pversion');
+  if(verEl){
+    const sha = String(window.APP_SHA || 'unknown').slice(0, 7);
+    verEl.textContent =
+      `v${window.APP_VERSION || 'dev'} · build ${window.APP_BUILD || 0} · ` +
+      `${window.APP_DATE || 'local'} · ${sha}`;
+  }
+}
+
 // ════════════════════════════════════════════════════════
 //  FEATURE TOGGLES (Pixelize, Sloth)
 // ════════════════════════════════════════════════════════

@@ -26,6 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Stamp version.js
+        run: |
+          cat > assets/version.js <<EOF
+          window.APP_VERSION = '${{ github.ref_name }}';
+          window.APP_BUILD   = '${{ github.run_number }}';
+          window.APP_DATE    = '$(date -u +%Y-%m-%dT%H:%M:%SZ)';
+          window.APP_SHA     = '${{ github.sha }}';
+          EOF
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
