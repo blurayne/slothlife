@@ -3477,16 +3477,37 @@ let killHold = null;          // { pointerId, startWX, startWY }
 const KILL_HOLD_S = 3.0;
 const KILL_CANCEL_DIST = 30;
 
+// Helper: when a pinch gesture starts/ends we have to flush every other
+// in-flight single-finger gesture so a finger lifted at the end of a
+// pinch doesn't accidentally swing the sloth or pan the scene.
+function _abortSingleFingerGestures(){
+  pendingTap = null;
+  isPanning = false;
+  if(killHold){
+    killHold = null;
+    if(sloth) sloth.killHoldT = 0;
+  }
+}
+
+// Build a snapshot of currently-tracked pointers as an array of {x, y}.
+function _pointerArray(){
+  const out = [];
+  for(const p of activePointers.values()) out.push(p);
+  return out;
+}
+
 canvas.addEventListener('pointerdown', e=>{
   // Ignore canvas input while a UI overlay is up (start, name, end)
   if(gameState !== 'PLAYING') return;
   const {x: cx, y: cy} = getCanvasXY(e);
+  activePointers.set(e.pointerId, { x: cx, y: cy });
   // Pause-toggle: tap on the clock face in the top HUD. Use a generous
   // hit radius (1.8× clock radius) so it's easy to hit with a fingertip.
-  if(!gameOver){
+  if(!gameOver && activePointers.size === 1){
     const r = _hudBarsRect();
     const dx = cx - r.clockX, dy = cy - r.clockY;
     if(dx*dx + dy*dy <= (r.clockR * 1.8) * (r.clockR * 1.8)){
+      activePointers.delete(e.pointerId);
       togglePause();
       return;
     }
@@ -3495,6 +3516,26 @@ canvas.addEventListener('pointerdown', e=>{
   if(paused) return;
   // Any tap on the canvas counts as activity → reset idle timer
   userIdleT = 0;
+  // Two-finger pinch — only when ZOOM is enabled. Cancels any single-
+  // finger gesture in flight so the same finger can't ALSO be panning.
+  if(zoomMode && activePointers.size === 2){
+    _abortSingleFingerGestures();
+    const ps = _pointerArray();
+    const midCx = (ps[0].x + ps[1].x) * 0.5;
+    const dist0 = Math.max(1, Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y));
+    pinch = {
+      ids:       [...activePointers.keys()],
+      dist0,
+      zoom0:     worldZoom,
+      anchorWX:  canvasToWorldX(midCx),
+      offset0:   sceneOffsetX,
+    };
+    canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+  // After this point the single-finger paths only run when this is the
+  // sole active pointer — a third+ finger does nothing.
+  if(activePointers.size !== 1) return;
   // Always remember where the touch started so we can decide whether
   // it was a drag or a tap on pointerup.
   panStartX = cx;  panStartY = cy;
@@ -3505,8 +3546,9 @@ canvas.addEventListener('pointerdown', e=>{
   // either; the cancel handler below resets killHoldT to 0.
   if(cy < trunkBY && sloth && sloth.alive && !sloth.charred){
     const wx = canvasToWorldX(cx);
-    if(sloth.isHitByTap(wx, cy)){
-      killHold = { pointerId: e.pointerId, startWX: wx, startWY: cy };
+    const wy = canvasToWorldY(cy);
+    if(sloth.isHitByTap(wx, wy)){
+      killHold = { pointerId: e.pointerId, startWX: wx, startWY: wy };
       sloth.killHoldT = 0.001;
       pendingTap = null;
       isPanning = false;
@@ -3523,16 +3565,33 @@ canvas.addEventListener('pointerdown', e=>{
     return;
   }
   // Above the grass: queue a possible tap on the world.
-  pendingTap = { wx: canvasToWorldX(cx), wy: cy };
+  pendingTap = { wx: canvasToWorldX(cx), wy: canvasToWorldY(cy) };
   isPanning = false;
 });
 
 canvas.addEventListener('pointermove', e=>{
   const {x: cx, y: cy} = getCanvasXY(e);
+  if(activePointers.has(e.pointerId)){
+    activePointers.set(e.pointerId, { x: cx, y: cy });
+  }
+  // Active pinch: rescale + reanchor the X midpoint.
+  if(pinch && pinch.ids.includes(e.pointerId)){
+    const a = activePointers.get(pinch.ids[0]);
+    const b = activePointers.get(pinch.ids[1]);
+    if(!a || !b){ pinch = null; return; }
+    const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    const midCx = (a.x + b.x) * 0.5;
+    worldZoom = clamp(pinch.zoom0 * dist / pinch.dist0, ZOOM_MIN, ZOOM_MAX);
+    // Solve for the offset that keeps the original anchor world-x under
+    // the (new) midpoint canvas-x.
+    sceneOffsetX = (midCx - W * 0.5) / worldZoom + W * 0.5 - pinch.anchorWX;
+    return;
+  }
   // Cancel an in-progress kill-hold if the finger drifts too far.
   if(killHold && e.pointerId === killHold.pointerId){
     const wx = canvasToWorldX(cx);
-    if(Math.hypot(wx - killHold.startWX, cy - killHold.startWY) > KILL_CANCEL_DIST){
+    const wy = canvasToWorldY(cy);
+    if(Math.hypot(wx - killHold.startWX, wy - killHold.startWY) > KILL_CANCEL_DIST){
       killHold = null;
       if(sloth) sloth.killHoldT = 0;
     }
@@ -3548,8 +3607,9 @@ canvas.addEventListener('pointermove', e=>{
     pendingTap = null;
   }
   if(isPanning){
-    sceneOffsetX = panStartOffset + dx;
-    // Clamp to range with rubber-band feel handled in the frame loop.
+    // Drag distance maps 1:1 to the screen even when zoomed → divide by
+    // the current zoom so the world feels "stuck to the finger".
+    sceneOffsetX = panStartOffset + dx / worldZoom;
     const now = performance.now();
     const dt2 = Math.max(1, now - panLastT) / 1000;
     panVelX = (cx - panLastX) / dt2;
@@ -3558,6 +3618,18 @@ canvas.addEventListener('pointermove', e=>{
 });
 
 function _endPan(e){
+  // Drop the pointer from the active set.
+  if(e) activePointers.delete(e.pointerId);
+  // If a pinch was active, the lift drops the gesture entirely. Don't
+  // start a tap or pan on the remaining finger — consume both lifts
+  // so a pinch never accidentally swings the sloth.
+  if(pinch){
+    if(!e || pinch.ids.includes(e.pointerId)){
+      pinch = null;
+      _abortSingleFingerGestures();
+      return;
+    }
+  }
   // Released before the kill-hold completed — clear the gesture and the
   // visible blackening, no normal tap follows.
   if(killHold && (!e || e.pointerId === killHold.pointerId)){
@@ -3576,13 +3648,16 @@ function _endPan(e){
   if(!sloth || !slothMode || sloth.state==='FALLING') return;
   if(sloth.wake()) return;
   if(sloth.state !== 'HANGING') return;
-  // Use tap coords (world-space) as the resolution input.
-  const x = tap.wx;
-  const y = tap.wy;
-  __runTapLogic(x, y);
+  __runTapLogic(tap.wx, tap.wy);
 }
 canvas.addEventListener('pointerup',     _endPan);
 canvas.addEventListener('pointercancel', e=>{
+  if(e) activePointers.delete(e.pointerId);
+  if(pinch && pinch.ids.includes(e.pointerId)){
+    pinch = null;
+    _abortSingleFingerGestures();
+    return;
+  }
   isPanning = false;
   pendingTap = null;
   if(killHold && e.pointerId === killHold.pointerId){
@@ -4875,6 +4950,10 @@ function restartGame(){
   didWin = false;
   _endReason = '';
   livesBonusGiven = 0;
+  // Reset zoom so a fresh run always starts at the original scale.
+  worldZoom = 1.0;
+  pinch = null;
+  activePointers.clear();
   gameDaysElapsed = 0;
   _lastYearMark = 0;
   _lastMonthMark = 0;
@@ -5714,9 +5793,11 @@ function frame(ts){
     if(p.x>W+110) Object.assign(p,mkParticle(false));
   }
 
-  // Apply pan friction when not actively dragging
+  // Apply pan friction when not actively dragging. panVelX is in
+  // canvas px/s; divide by zoom so the inertia matches the on-screen
+  // glide (one screen pixel of momentum is one pixel, not one world unit).
   if(!isPanning){
-    sceneOffsetX += panVelX * dt;
+    sceneOffsetX += panVelX * dt / worldZoom;
     panVelX *= Math.pow(PAN_FRICTION, dt * 60);
     if(Math.abs(panVelX) < 1) panVelX = 0;
     // Soft clamp at the edges of pan range (rubber-band)
@@ -5732,7 +5813,7 @@ function frame(ts){
   // Draw scene
   ctx.clearRect(0,0,W,H);
   ctx.save();
-  ctx.translate(sceneOffsetX, 0);
+  applyCameraTransform();
   drawBg();
   drawParticles();
   drawTrunk();
@@ -5865,7 +5946,7 @@ function frame(ts){
   // needs the camera offset re-applied. The HUD bars stay screen-space.
   if(sloth){
     ctx.save();
-    ctx.translate(sceneOffsetX, 0);
+    applyCameraTransform();
     sloth.drawReachOverlay();
     ctx.restore();
   }

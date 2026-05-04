@@ -6,10 +6,13 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Open
 
-- [ ] [Two-finger pinch zoom (toggleable, default off)](.claude/plans/two-finger-zoom.md)
+_(none)_
 
 ## Shipped
 
+- [x] [Two-finger pinch zoom (toggleable, default off)](.claude/plans/two-finger-zoom.md)
+- [x] **Workflow: Node 24 opt-in for JS actions**
+- [x] **Lightning kill: debit lives immediately (player → all, natural → 1)**
 - [x] **Lightning kill ends the run + dedicated "you bastard" banner**
 - [x] **Bug fix: charred-sloth source-atop blackout (heavy-rain "screen black" bug)**
 - [x] **Cache-bust CSS/JS/audio URLs with `?v=<SHA>` injected by deploy workflow**
