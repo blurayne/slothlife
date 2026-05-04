@@ -1,10 +1,12 @@
 # A Sloth's Life
 
+[![Deploy to GitHub Pages](https://github.com/blurayne/slothlife/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/blurayne/slothlife/actions/workflows/deploy-pages.yml)
+
+> ▶ **Play it now: <https://blurayne.github.io/slothlife/>**
+
 A tiny browser game: guide a sloth through a windswept tree, swing
 between branches, eat leaves and apples, sleep through the lean
 hours, and try not to starve or fall.
-
-**Play:** https://blurayne.github.io/slothlife/
 
 ## How to play
 
