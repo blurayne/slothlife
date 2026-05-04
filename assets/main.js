@@ -149,6 +149,8 @@ const tSunShade   = document.getElementById('t-sunshade');
 const lSunShade   = document.getElementById('l-sunshade');
 const tSunShadow  = document.getElementById('t-sunshadow');
 const lSunShadow  = document.getElementById('l-sunshadow');
+const tZoom       = document.getElementById('t-zoom');
+const lZoom       = document.getElementById('l-zoom');
 const tWeight     = document.getElementById('t-weight');
 const lWeight     = document.getElementById('l-weight');
 const scanlines   = document.getElementById('scanlines');
@@ -158,7 +160,16 @@ let slothMode = true;
 let blurBgMode = true;
 let sunShadeMode = false;
 let sunShadowMode = true;
+let zoomMode = false;             // two-finger pinch zoom (default off)
 let weightMode = true;
+
+// Camera zoom state. worldZoom always anchors around the canvas centre;
+// activePointers + pinch drive multi-touch.
+let worldZoom = 1.0;
+const ZOOM_MIN = 1.0;
+const ZOOM_MAX = 4.0;
+const activePointers = new Map(); // pointerId → { x, y } in canvas px
+let pinch = null;                 // { ids, dist0, zoom0, anchorWX, offset0 }
 
 function applyPixel(){
   tPixel.classList.toggle('on', pixelMode);
@@ -184,6 +195,16 @@ function applySunShadow(){
   tSunShadow.classList.toggle('on', sunShadowMode);
   lSunShadow.textContent = sunShadowMode ? 'ON' : 'OFF';
 }
+function applyZoom(){
+  tZoom.classList.toggle('on', zoomMode);
+  lZoom.textContent = zoomMode ? 'ON' : 'OFF';
+  // Switching the feature off while zoomed snaps the view back so the
+  // user isn't left looking at a magnified frame they can't restore.
+  if(!zoomMode){
+    worldZoom = 1.0;
+    pinch = null;
+  }
+}
 function applyWeight(){
   tWeight.classList.toggle('on', weightMode);
   lWeight.textContent = weightMode ? 'ON' : 'OFF';
@@ -193,6 +214,7 @@ tSloth.addEventListener('click', ()=>{ slothMode = !slothMode; applySloth(); });
 tBlurBg.addEventListener('click', ()=>{ blurBgMode = !blurBgMode; applyBlurBg(); });
 tSunShade.addEventListener('click', ()=>{ sunShadeMode = !sunShadeMode; applySunShade(); });
 tSunShadow.addEventListener('click', ()=>{ sunShadowMode = !sunShadowMode; applySunShadow(); });
+tZoom.addEventListener('click', ()=>{ zoomMode = !zoomMode; applyZoom(); });
 tWeight.addEventListener('click', ()=>{ weightMode = !weightMode; applyWeight(); });
 
 // ════════════════════════════════════════════════════════
@@ -1751,6 +1773,7 @@ class Sloth{
     this.charred = false;
     this.charredAt = 0;
     this.playerKilled = false;    // true ⇒ kill-by-hold; ends run on _die()
+    this.livesAlreadyDocked = false;   // lives debit was already applied at strike time
 
     // Eating state (drives hunger gain + chew animation)
     this.eatTarget = null;        // {kind:'leaf'|'apple', branch?, fruit?, x, y}
@@ -2281,6 +2304,12 @@ class Sloth{
     this.frotv = (Math.random() - 0.5) * 2.0;
     this.activeLimbs = [];
     this.reachTarget = null;
+    // Debit lives now so the hearts HUD updates the same frame as the
+    // strike, not when _die() runs ~1s later. Player-initiated kills
+    // burn every remaining life; natural strikes cost just one.
+    if(playerInitiated) lives = 0;
+    else                lives = Math.max(0, lives - 1);
+    this.livesAlreadyDocked = true;
   }
 
   // ─────────────────────────────────────────────────────
@@ -2293,15 +2322,17 @@ class Sloth{
   _die(){
     if(!this.alive) return;
     this.alive = false;
-    // Player-triggered lightning kill ends the whole run regardless of
-    // remaining lives — burn them all so the lives-bonus zeroes out
-    // and the game-over modal shows the dedicated "you bastard" banner.
+    // Player-triggered lightning kill ends the whole run. lives are
+    // already 0 from charByLightning's immediate debit; just trigger
+    // the dedicated "you bastard" end-game banner.
     if(this.playerKilled){
-      lives = 0;
       _endGame(false, 'killed');
       return;
     }
-    lives -= 1;
+    // Normal terminal states (slip, starve, hard ground impact) dock
+    // a life here. Natural lightning strikes already debited at strike
+    // time, so livesAlreadyDocked skips the second decrement.
+    if(!this.livesAlreadyDocked) lives -= 1;
     if(lives <= 0){
       _endGame(false);
     } else {
@@ -3412,8 +3443,23 @@ function getCanvasXY(e){
   const r=canvas.getBoundingClientRect();
   return { x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height) };
 }
-// Convert a canvas-space x to world-space x by removing the camera offset.
-function canvasToWorldX(canvasX){ return canvasX - sceneOffsetX; }
+// Camera transform: zoom around the canvas centre, then horizontal pan.
+// One source of truth — every place that draws world content saves the
+// context, calls this, and restores afterwards.
+function applyCameraTransform(){
+  const cx = W * 0.5, cy = H * 0.5;
+  ctx.translate(cx, cy);
+  ctx.scale(worldZoom, worldZoom);
+  ctx.translate(-cx + sceneOffsetX, -cy);
+}
+// Inverse of applyCameraTransform — at zoom = 1 these collapse to the
+// previous (cx - sceneOffsetX) / (cy) so existing call sites stay correct.
+function canvasToWorldX(canvasX){
+  return (canvasX - W * 0.5) / worldZoom + W * 0.5 - sceneOffsetX;
+}
+function canvasToWorldY(canvasY){
+  return (canvasY - H * 0.5) / worldZoom + H * 0.5;
+}
 
 // ── PAN STATE / HANDLERS ────────────────────────────
 let isPanning = false;
