@@ -18,6 +18,26 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
+// Page → SW message channel: SKIP_WAITING (newly-installed worker
+// finishes activation early) and CLEAR_CACHE (page-triggered refresh
+// asks the SW to drop every Cache Storage entry it owns).
+self.addEventListener('message', (event) => {
+  const msg = event.data || {};
+  if (msg.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
+  if (msg.type === 'CLEAR_CACHE') {
+    event.waitUntil((async () => {
+      const names = await caches.keys();
+      await Promise.all(names.map((n) => caches.delete(n)));
+      if (event.ports && event.ports[0]) {
+        event.ports[0].postMessage({ type: 'CACHE_CLEARED' });
+      }
+    })());
+  }
+});
+
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const names = await caches.keys();

@@ -136,10 +136,13 @@ applyPanelState();
   });
 }
 
-// REFRESH button — unregister the service worker, drop every cache,
-// then navigate to the page with a fresh ?refresh=<ts> so the request
-// is unambiguously a new cache key. Belt-and-suspenders against the
-// GitHub Pages 10-min HTML cache.
+// REFRESH button — talk to the active service worker instead of nuking
+// it: ask the SW to (a) check for a new version (registration.update),
+// (b) clear its caches via a CLEAR_CACHE message, (c) hand control to
+// any newly-installed-but-waiting SW via SKIP_WAITING. Then navigate
+// to the same URL with a fresh ?refresh=<base36 ts> as a final
+// belt-and-suspenders cache-bust. Tolerant: if the SW isn't there or
+// any step throws, fall through to the cache-bust reload.
 {
   const bRefresh = document.getElementById('b-refresh');
   if(bRefresh){
@@ -147,14 +150,37 @@ applyPanelState();
       bRefresh.disabled = true;
       try {
         if('serviceWorker' in navigator){
-          const regs = await navigator.serviceWorker.getRegistrations();
-          await Promise.all(regs.map((r) => r.unregister()));
+          const reg = await navigator.serviceWorker.getRegistration();
+          if(reg){
+            try { await reg.update(); } catch(_){}
+            if(reg.active){
+              await new Promise((resolve) => {
+                const ch = new MessageChannel();
+                ch.port1.onmessage = (e) => {
+                  if(e.data && e.data.type === 'CACHE_CLEARED') resolve();
+                };
+                try {
+                  reg.active.postMessage({ type: 'CLEAR_CACHE' }, [ch.port2]);
+                } catch(_){ resolve(); }
+                setTimeout(resolve, 800);          // don't hang forever
+              });
+            }
+            if(reg.waiting){
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+              await new Promise((resolve) => {
+                let done = false;
+                const onChange = () => {
+                  if(!done){ done = true; resolve(); }
+                };
+                navigator.serviceWorker.addEventListener(
+                  'controllerchange', onChange, { once: true }
+                );
+                setTimeout(() => { if(!done){ done = true; resolve(); } }, 800);
+              });
+            }
+          }
         }
-        if('caches' in window){
-          const names = await caches.keys();
-          await Promise.all(names.map((n) => caches.delete(n)));
-        }
-      } catch(e){ console.warn('Refresh cleanup failed:', e); }
+      } catch(e){ console.warn('Refresh: SW interaction failed:', e); }
       const url = new URL(location.href);
       url.searchParams.set('refresh', Date.now().toString(36));
       location.href = url.toString();
