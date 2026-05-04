@@ -28,19 +28,39 @@ jobs:
       - uses: actions/configure-pages@v5
       - name: Stamp version.js
         run: |
-          cat > assets/version.js <<EOF
-          window.APP_VERSION = '${{ github.ref_name }}';
-          window.APP_BUILD   = '${{ github.run_number }}';
-          window.APP_DATE    = '$(date -u +%Y-%m-%dT%H:%M:%SZ)';
-          window.APP_SHA     = '${{ github.sha }}';
-          EOF
+          set -euo pipefail
+          # Build version.js with one echo per line — no heredoc whitespace
+          # gotchas. Then cat it back so the workflow log shows exactly
+          # what the deployed file will contain (verifiable from the
+          # Actions tab if anyone wonders whether the stamp ran).
+          {
+            echo "window.APP_VERSION = '${{ github.ref_name }}';"
+            echo "window.APP_BUILD   = '${{ github.run_number }}';"
+            echo "window.APP_DATE    = '$(date -u +%Y-%m-%dT%H:%M:%SZ)';"
+            echo "window.APP_SHA     = '${{ github.sha }}';"
+          } > assets/version.js
+          echo "--- stamped assets/version.js ---"
+          cat assets/version.js
+          # Sanity: APP_SHA must be the substituted 40-char hex, not the
+          # literal placeholder. (github.sha is always a real hex string.)
+          if grep -qF "APP_SHA     = 'unknown';" assets/version.js; then
+            echo "::error::version.js still has APP_SHA='unknown' — stamp failed"
+            exit 1
+          fi
       - name: Cache-bust HTML asset URLs
         run: |
+          set -euo pipefail
           # Replace the ?v=dev cache-bust placeholder on every <link>/<script>
           # in index.html with the current commit SHA so browsers reload the
           # CSS/JS on each deploy. Audio fetched in JS uses window.APP_SHA
           # (set by the stamp step above) for the same purpose.
           sed -i "s/?v=dev/?v=${{ github.sha }}/g" index.html
+          echo "--- index.html script/link tags ---"
+          grep -E '(href|src)="assets/' index.html || true
+          if grep -q "?v=dev" index.html; then
+            echo "::error::index.html still has ?v=dev — sed failed"
+            exit 1
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
