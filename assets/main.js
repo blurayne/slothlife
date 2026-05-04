@@ -1622,16 +1622,24 @@ function makeGrassBlades(){
 // the props alongside the tree.
 function makeDeadTrunks(){
   deadTrunks = [];
-  const count = 6 + ((Math.random() * 4) | 0);   // 6–9 props
+  // 6–9 stumps + logs PLUS a separate scatter of dead-wood twigs
+  // (abgestorbenes Holz / Geäst) at miscellaneous angles in the grass.
+  const stumpCount = 6 + ((Math.random() * 4) | 0);
+  const twigCount  = 8 + ((Math.random() * 6) | 0);   // 8–13 twigs
   const groundDepth = H - trunkBY;
-  for(let i = 0; i < count; i++){
-    const fallen = Math.random() < 0.30;
-    // Spread across [W/2 − PAN_RANGE, W/2 + PAN_RANGE]; keep a small
-    // gap around the live trunk so props don't grow inside the roots.
+
+  // Pick a world-X clear of the live trunk's roots.
+  const pickX = () => {
     let x;
     do {
       x = W * 0.5 + (Math.random() * 2 - 1) * (PAN_RANGE - 30);
     } while (Math.abs(x - W * 0.5) < 80);
+    return x;
+  };
+
+  // Stumps + logs.
+  for(let i = 0; i < stumpCount; i++){
+    const fallen = Math.random() < 0.30;
     const yOff = Math.random() * groundDepth * 0.20;
     const baseY = trunkBY + 6 + yOff;
     const h = fallen
@@ -1645,9 +1653,29 @@ function makeDeadTrunks(){
     const tint = Math.random();
     const bark = `rgb(${(72 + tint*30)|0}, ${(56 + tint*22)|0}, ${(40 + tint*18)|0})`;
     const core = `rgb(${(112 + tint*30)|0}, ${(86 + tint*22)|0}, ${(58 + tint*18)|0})`;
-    deadTrunks.push({ x, baseY, h, w, angle, fallen, bark, core,
+    deadTrunks.push({ kind: fallen ? 'log' : 'stump',
+                      x: pickX(), baseY, h, w, angle, bark, core,
                       seed: Math.random() });
   }
+
+  // Twigs — thin sticks at any orientation, scattered across the
+  // grass strip both horizontally and vertically. Some upright-ish,
+  // some lying flat, most somewhere in between.
+  for(let i = 0; i < twigCount; i++){
+    const yOff = Math.random() * groundDepth * 0.55;     // deeper into the grass
+    const baseY = trunkBY + 4 + yOff;
+    const h = 16 + Math.random() * 28;        // length
+    const w = 2.2 + Math.random() * 2.2;      // thickness
+    // Free orientation: anywhere in [-PI, PI].
+    const angle = (Math.random() * 2 - 1) * PI;
+    const tint = Math.random();
+    const bark = `rgb(${(82 + tint*32)|0}, ${(62 + tint*22)|0}, ${(44 + tint*18)|0})`;
+    const core = bark;
+    deadTrunks.push({ kind: 'twig',
+                      x: pickX(), baseY, h, w, angle, bark, core,
+                      seed: Math.random() });
+  }
+
   // Sort by Y so further-back props draw first — cheap depth feel.
   deadTrunks.sort((a, b) => a.baseY - b.baseY);
 }
@@ -1657,7 +1685,21 @@ function drawDeadTrunks(){
     ctx.save();
     ctx.translate(t.x, t.baseY);
     ctx.rotate(t.angle);
-    // Trunk body — slight taper toward the top.
+    if(t.kind === 'twig'){
+      // Thin tapered stick. No jagged crown / knot — just a stroke
+      // from base to tip with a slight wedge so it reads as a stick.
+      ctx.fillStyle = t.bark;
+      ctx.beginPath();
+      ctx.moveTo(-t.w * 0.5,  0);
+      ctx.lineTo(-t.w * 0.20, -t.h);
+      ctx.lineTo( t.w * 0.20, -t.h);
+      ctx.lineTo( t.w * 0.5,  0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    // Stump / log: tapered trunk body with a lighter core stripe.
     ctx.fillStyle = t.bark;
     ctx.beginPath();
     ctx.moveTo(-t.w * 0.5, 0);
@@ -1666,7 +1708,6 @@ function drawDeadTrunks(){
     ctx.lineTo( t.w * 0.5, 0);
     ctx.closePath();
     ctx.fill();
-    // Lighter core stripe down one side for shape.
     ctx.fillStyle = t.core;
     ctx.beginPath();
     ctx.moveTo(-t.w * 0.10, 0);
@@ -1675,7 +1716,7 @@ function drawDeadTrunks(){
     ctx.lineTo( t.w * 0.18, 0);
     ctx.closePath();
     ctx.fill();
-    if(!t.fallen){
+    if(t.kind === 'stump'){
       // Jagged broken top — three short peaks.
       ctx.fillStyle = '#1a0e08';
       ctx.beginPath();
