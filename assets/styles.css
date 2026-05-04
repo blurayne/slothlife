@@ -98,7 +98,9 @@
   .pversion{
     font-size:9px;
     color:rgba(255,255,255,.40);
-    margin:-4px 0 8px;
+    margin:0 0 10px;
+    padding-bottom:7px;
+    border-bottom:1px solid rgba(255,255,255,.06);
     letter-spacing:.05em;
     word-break:break-all;
   }
@@ -293,3 +295,12 @@
   }
   .ov-final .big{color:#FFE678;font-size:22px;font-weight:bold}
   .ov-final .bonus{color:#FFC2A8;font-size:11px;margin-top:4px}
+
+  .ov-version{
+    margin-top:14px;
+    text-align:center;
+    font:9px 'Courier New',monospace;
+    color:rgba(220,235,255,.45);
+    letter-spacing:.05em;
+    word-break:break-all;
+  }

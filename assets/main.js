@@ -122,17 +122,18 @@ document.addEventListener('click', (e)=>{
 });
 applyPanelState();
 
-// Stamp the panel header with the version info baked into version.js
-// (defaults to dev/local/unknown; the Pages workflow rewrites the file
-// before deploy with the real version, build #, ISO date, and SHA).
+// Stamp every `.js-version` element with the build info baked into
+// version.js (defaults to dev/local/unknown; the Pages workflow rewrites
+// version.js with real values before deploy). Currently used by the
+// settings-panel header and the bottom of the start-screen overlay.
 {
-  const verEl = document.getElementById('pversion');
-  if(verEl){
-    const sha = String(window.APP_SHA || 'unknown').slice(0, 7);
-    verEl.textContent =
-      `v${window.APP_VERSION || 'dev'} · build ${window.APP_BUILD || 0} · ` +
-      `${window.APP_DATE || 'local'} · ${sha}`;
-  }
+  const sha = String(window.APP_SHA || 'unknown').slice(0, 7);
+  const verText =
+    `v${window.APP_VERSION || 'dev'} · build ${window.APP_BUILD || 0} · ` +
+    `${window.APP_DATE || 'local'} · ${sha}`;
+  document.querySelectorAll('.js-version').forEach(el => {
+    el.textContent = verText;
+  });
 }
 
 // ════════════════════════════════════════════════════════
