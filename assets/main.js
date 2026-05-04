@@ -1748,6 +1748,7 @@ class Sloth{
     this.alive = true;
     this.charred = false;
     this.charredAt = 0;
+    this.playerKilled = false;    // true ⇒ kill-by-hold; ends run on _die()
 
     // Eating state (drives hunger gain + chew animation)
     this.eatTarget = null;        // {kind:'leaf'|'apple', branch?, fruit?, x, y}
@@ -2260,10 +2261,11 @@ class Sloth{
   //   sloth in pure black, then triggers a fall (which costs a life
   //   on landing or off-screen, just like any other fall).
   // ─────────────────────────────────────────────────────
-  charByLightning(){
+  charByLightning(playerInitiated = false){
     if(!this.alive || this.charred) return;
     this.charred = true;
     this.charredAt = performance.now() / 1000;
+    this.playerKilled = !!playerInitiated;
     // Drop limp — release all limbs and start falling
     for(const l of this.limbs){ l.gripped = false; l.state = 'FREE'; }
     this.state = 'FALLING';
@@ -2289,6 +2291,14 @@ class Sloth{
   _die(){
     if(!this.alive) return;
     this.alive = false;
+    // Player-triggered lightning kill ends the whole run regardless of
+    // remaining lives — burn them all so the lives-bonus zeroes out
+    // and the game-over modal shows the dedicated "you bastard" banner.
+    if(this.playerKilled){
+      lives = 0;
+      _endGame(false, 'killed');
+      return;
+    }
     lives -= 1;
     if(lives <= 0){
       _endGame(false);
@@ -4144,7 +4154,7 @@ function _spawnLightning(forceHitSloth = false){
   // Schedule thunder — distance varies for hitSloth (always close).
   const distance = hitSloth ? 0.05 : Math.random() * 1.2;
   setTimeout(() => Audio.playThunder(distance), Math.round(distance * 1000) + 80);
-  if(hitSloth && sloth) sloth.charByLightning();
+  if(hitSloth && sloth) sloth.charByLightning(forceHitSloth);
 }
 
 function drawLightning(){
@@ -4667,9 +4677,11 @@ function drawGameOverHUD(){
 }
 
 // End the run (win or loss). Awards the lives-remaining bonus once.
-function _endGame(win){
+let _endReason = '';            // '' | 'killed' — drives banner text
+function _endGame(win, reason = ''){
   if(gameOver) return;
   didWin = win;
+  _endReason = reason;
   livesBonusGiven = Math.max(0, lives) * 250;
   score += livesBonusGiven;
   if(score > highScore) highScore = score;
@@ -4717,8 +4729,13 @@ function showStart(){
 }
 function showNameEntry(){
   gameState = 'NAME';
-  document.getElementById('ov-name-banner').textContent = didWin ? 'YOU SURVIVE!' : 'GAME OVER';
-  document.getElementById('ov-name-banner').style.color = didWin ? '#9CE85B' : '#FFE678';
+  const killer = _endReason === 'killed';
+  const banner = didWin ? 'YOU SURVIVE!'
+              : killer ? 'YOU KILLED THAT POOR SLOTH, YOU BASTARD!'
+              :          'GAME OVER';
+  const color  = didWin ? '#9CE85B' : killer ? '#FFB0A0' : '#FFE678';
+  document.getElementById('ov-name-banner').textContent = banner;
+  document.getElementById('ov-name-banner').style.color = color;
   document.getElementById('ov-name-score').textContent = 'SCORE ' + score;
   const bonusEl = document.getElementById('ov-name-bonus');
   bonusEl.textContent = livesBonusGiven > 0 ? ('Includes lives bonus +' + livesBonusGiven) : '';
@@ -4731,8 +4748,13 @@ function showNameEntry(){
 }
 function showEndScreen(){
   gameState = 'END';
-  document.getElementById('ov-end-banner').textContent = didWin ? 'YOU SURVIVE!' : 'GAME OVER';
-  document.getElementById('ov-end-banner').style.color = didWin ? '#9CE85B' : '#FFE678';
+  const killer = _endReason === 'killed';
+  const banner = didWin ? 'YOU SURVIVE!'
+              : killer ? 'YOU KILLED THAT POOR SLOTH, YOU BASTARD!'
+              :          'GAME OVER';
+  const color  = didWin ? '#9CE85B' : killer ? '#FFB0A0' : '#FFE678';
+  document.getElementById('ov-end-banner').textContent = banner;
+  document.getElementById('ov-end-banner').style.color = color;
   document.getElementById('ov-end-score').textContent = 'SCORE ' + score;
   const bonusEl = document.getElementById('ov-end-bonus');
   bonusEl.textContent = livesBonusGiven > 0 ? ('Includes lives bonus +' + livesBonusGiven) : '';
@@ -4798,6 +4820,7 @@ function restartGame(){
   _sleepLabelAlpha = 0;
   gameOver = false;
   didWin = false;
+  _endReason = '';
   livesBonusGiven = 0;
   gameDaysElapsed = 0;
   _lastYearMark = 0;
