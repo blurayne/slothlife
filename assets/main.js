@@ -5706,32 +5706,32 @@ function drawSunShade(){
   if(rainIntensity > 0.05) return;
   const sun = getSunPos(dayTime);
   if(sun.opacity <= 0) return;
-  // Sun's horizontal screen position normalised to -1..+1.
-  const sunNx = (sun.x - W * 0.5) / (W * 0.5);
-  // Strength tapers off at the horizon (low sun = soft side-light)
-  // and peaks near zenith. sun.opacity already fades the whole effect
-  // around sunrise/sunset. P.shadeStrength scales the whole pass so
-  // the dev-mode slider drives all three shade contributions
-  // (branches, trunk, meadow) consistently. Clamped to keep the
-  // soft-light blend from punching pure black/white at high values.
-  const heightFactor = 1 - Math.min(1, Math.abs(sunNx));
-  const strength = Math.min(0.95,
-    sun.opacity * (0.20 + 0.30 * heightFactor) * P.shadeStrength);
+  // The sun disc is drawn inside applyCameraTransform (via
+  // drawSunMoon), so its visual screen position depends on
+  // sceneOffset + worldZoom. Recreate the same world→screen map
+  // here so the gradient stays locked to the visual sun through
+  // panning + pinch-zoom.
+  const cx = W * 0.5, cy = H * 0.5;
+  const sxScreen = (sun.x - cx + sceneOffsetX) * worldZoom + cx;
+  const syScreen = (sun.y - cy + sceneOffsetY) * worldZoom + cy;
+  // Strength scales with sun.opacity (sunset fade) and the
+  // dev-mode SHADE STRENGTH slider. Capped so the soft-light
+  // blend can't punch pure black/white at high values.
+  const strength = Math.min(0.95, sun.opacity * 0.40 * P.shadeStrength);
 
+  // Radial gradient anchored at the visual sun position. Bright
+  // warm at the centre, mid-neutral at half-radius, cool dark at
+  // the far edge. Smooth in both X AND Y so a sun high overhead
+  // casts light from above and there's no discrete left/right
+  // flip when it crosses the meridian.
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
-  const grad = ctx.createLinearGradient(0, 0, W, 0);
-  if(sunNx < 0){
-    // Sun on the LEFT → warm bright on the left, cool shadow on the right.
-    grad.addColorStop(0,   `rgba(255, 230, 170, ${strength})`);
-    grad.addColorStop(0.5, `rgba(180, 170, 140, ${strength * 0.30})`);
-    grad.addColorStop(1,   `rgba(15, 20, 40,   ${strength * 0.70})`);
-  } else {
-    // Sun on the RIGHT → mirror.
-    grad.addColorStop(0,   `rgba(15, 20, 40,   ${strength * 0.70})`);
-    grad.addColorStop(0.5, `rgba(180, 170, 140, ${strength * 0.30})`);
-    grad.addColorStop(1,   `rgba(255, 230, 170, ${strength})`);
-  }
+  const radius = Math.hypot(W, H);
+  const grad = ctx.createRadialGradient(
+    sxScreen, syScreen, 0, sxScreen, syScreen, radius);
+  grad.addColorStop(0,   `rgba(255, 230, 170, ${strength})`);
+  grad.addColorStop(0.5, `rgba(180, 170, 140, ${strength * 0.30})`);
+  grad.addColorStop(1,   `rgba(15, 20, 40,   ${strength * 0.70})`);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
