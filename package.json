@@ -1,0 +1,14 @@
+{
+  "name": "slothlife",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sloth's Life — a windy-tree browser game. Static frontend (no build) + optional Convex backend for shared highscores when deployed to Vercel.",
+  "scripts": {
+    "convex:dev":    "convex dev",
+    "convex:deploy": "convex deploy"
+  },
+  "devDependencies": {
+    "convex":     "^1.16.0",
+    "typescript": "^5.4.0"
+  }
+}

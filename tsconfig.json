@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target":       "ESNext",
+    "module":       "ESNext",
+    "moduleResolution": "Bundler",
+    "strict":       true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "noEmit":       true
+  },
+  "include": ["convex/**/*.ts"]
+}

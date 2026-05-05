@@ -3,3 +3,10 @@
 *.swo
 .idea/
 .vscode/
+
+# Node + Convex
+node_modules/
+convex/_generated/
+.convex/
+.env
+.env.local
