@@ -156,7 +156,7 @@ function _holdTick(){
   if(t >= 1){
     _lastHoldFireT = performance.now();
     _holdEnd();
-    toggleDevMode();
+    enterDevMode();
     return;
   }
   _holdRaf = requestAnimationFrame(_holdTick);
@@ -193,17 +193,28 @@ function showDevModeToast(text){
   el._t = setTimeout(() => el.classList.remove('show'), 1500);
 }
 
-function toggleDevMode(){
-  devMode = !devMode;
-  try {
-    if(devMode) localStorage.setItem(DEVMODE_KEY, '1');
-    else        localStorage.removeItem(DEVMODE_KEY);
-  } catch(_){}
+// Long-press unconditionally enters dev mode and opens the panel
+// (no toggle). To return to player mode the user clicks the
+// 🔒 EXIT DEV MODE button in the dev-only footer of the panel.
+function enterDevMode(){
+  const wasInDev = devMode;
+  devMode = true;
+  try { localStorage.setItem(DEVMODE_KEY, '1'); } catch(_){}
   applyDevMode();
-  // Make sure the panel is open so the player sees what changed.
   panelOpen = true;
   applyPanelState();
-  showDevModeToast(devMode ? 'DEVELOPER MODE ON' : 'DEVELOPER MODE OFF');
+  if(!wasInDev) showDevModeToast('DEVELOPER MODE ON');
+}
+function exitDevMode(){
+  if(!devMode) return;
+  devMode = false;
+  try { localStorage.removeItem(DEVMODE_KEY); } catch(_){}
+  applyDevMode();
+  // Keep the panel open in player mode so the player can see the
+  // mode switch took effect.
+  panelOpen = true;
+  applyPanelState();
+  showDevModeToast('DEVELOPER MODE OFF');
 }
 
 icSettings.addEventListener('pointerdown', (e) => {
@@ -410,6 +421,16 @@ applyPanelState();
       activePointers.clear();
       showStart();
     });
+  }
+}
+
+// EXIT DEV MODE button — symmetric counterpart to the long-press
+// entry. Lives in the .dev-only block of the panel so it's only
+// visible while devMode is true.
+{
+  const bLockDev = document.getElementById('b-lock-dev');
+  if(bLockDev){
+    bLockDev.addEventListener('click', () => exitDevMode());
   }
 }
 

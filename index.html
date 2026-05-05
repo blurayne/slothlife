@@ -181,7 +181,6 @@
 
   <!-- Player-mode rows (always visible). The .dev-only sections
        below are hidden whenever #panel.locked. -->
-  <div class="psec">PLAYER</div>
   <div class="ptog-row"><span class="pname">PIXELIZE</span>
     <div class="tog" id="t-pixel"></div><span class="tlbl" id="l-pixel">OFF</span></div>
   <div class="prow"><span class="pname">PIXEL SIZE</span>
@@ -298,6 +297,13 @@
   <div class="prow"><span class="pname">REACH TIME</span>
     <input type="range" id="s-reachTime" min="0.3" max="3" step="0.1" value="2">
     <span class="pval" id="v-reachTime">2.0</span></div>
+
+  <!-- Symmetric counterpart to the long-press dev-mode entry: a
+       button that drops dev mode + clears the localStorage flag.
+       Visible only inside the .dev-only block (i.e. only while in
+       dev mode), so the player view never shows it. -->
+  <div class="prow" style="margin-top:14px"><span class="pname"></span>
+    <button id="b-lock-dev" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">🔒 EXIT DEV MODE</button></div>
   </div><!-- /.dev-only -->
 
   <!-- RESTART always visible; bottom of the panel so the
