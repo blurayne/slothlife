@@ -1458,7 +1458,51 @@ let gameState = 'START';
 const HS_KEY = 'sloth-safari-hs-v1';
 const HS_MAX = 8;
 let highscores = [];
+
+// ── HIGHSCORE BACKEND ────────────────────────────────────
+// On a Vercel deployment with window.CONVEX_URL set (stamped by the
+// deploy workflow from the CONVEX_URL secret), highscores live in
+// Convex so every player sees the same leaderboard. Anywhere else
+// (GitHub Pages, file://, local http.server, …) we fall back to
+// localStorage as a per-browser leaderboard.
+function _isVercelHosted(){
+  const h = location.hostname || '';
+  return h.endsWith('.vercel.app') || /\.vercel\./.test(h) ||
+         h === 'vercel.app' || h.includes('-vercel-');
+}
+const useConvexHighscores = _isVercelHosted() && !!window.CONVEX_URL;
+
+let _convexClientPromise = null;
+async function _getConvexClient(){
+  if(_convexClientPromise) return _convexClientPromise;
+  _convexClientPromise = (async () => {
+    const mod = await import('https://esm.sh/convex@1.16.0/browser');
+    return new mod.ConvexClient(window.CONVEX_URL);
+  })();
+  return _convexClientPromise;
+}
+
+async function _refreshHighscoresFromConvex(){
+  if(!useConvexHighscores) return;
+  try {
+    const client = await _getConvexClient();
+    const rows = await client.query('highscores:list', { limit: HS_MAX });
+    highscores = rows.map((r) => ({
+      name: r.name, score: r.score, date: r.date,
+    }));
+    if(document.getElementById('ov-start-hs')) renderHighscoreTable('ov-start-hs');
+    if(document.getElementById('ov-end-hs'))   renderHighscoreTable('ov-end-hs', score);
+  } catch(e){ console.warn('Convex highscores fetch failed:', e); }
+}
+
 function loadHighscores(){
+  if(useConvexHighscores){
+    // Show empty until the async fetch lands; render will refresh
+    // again once results arrive.
+    highscores = [];
+    _refreshHighscoresFromConvex();
+    return;
+  }
   try{
     const raw = localStorage.getItem(HS_KEY);
     if(raw){
@@ -1468,6 +1512,7 @@ function loadHighscores(){
   } catch(e){ highscores = []; }
 }
 function saveHighscores(){
+  if(useConvexHighscores) return;            // server-of-truth lives elsewhere
   try{ localStorage.setItem(HS_KEY, JSON.stringify(highscores)); } catch(e){}
 }
 function qualifiesForLeaderboard(s){
@@ -1476,10 +1521,23 @@ function qualifiesForLeaderboard(s){
   return s > highscores[highscores.length - 1].score;
 }
 function insertHighscore(name, s){
-  highscores.push({ name: (name||'???').slice(0,8).toUpperCase(), score: s, date: Date.now() });
+  const sanitized = (name || '???').slice(0, 8).toUpperCase();
+  // Always put the new entry into the in-memory cache first so the UI
+  // reflects it immediately; persistence then routes by environment.
+  highscores.push({ name: sanitized, score: s, date: Date.now() });
   highscores.sort((a, b) => b.score - a.score);
   highscores = highscores.slice(0, HS_MAX);
-  saveHighscores();
+  if(useConvexHighscores){
+    (async () => {
+      try {
+        const client = await _getConvexClient();
+        await client.mutation('highscores:submit', { name: sanitized, score: s });
+        await _refreshHighscoresFromConvex();
+      } catch(e){ console.warn('Convex highscores submit failed:', e); }
+    })();
+  } else {
+    saveHighscores();
+  }
 }
 loadHighscores();
 let scorePopups = [];   // {x, y, vy, age, life, text, color}

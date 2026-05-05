@@ -81,11 +81,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // version.js — same network-first treatment as HTML so the panel
-  // header (and the diagnostic <meta name="app-version">) never reflect
-  // stale build info even if the cache-bust query is missing or the
-  // browser somehow lands on a cached entry from an older deploy.
-  if (url.pathname.endsWith('/assets/version.js')) {
+  // version.js + backend-config.js — same network-first treatment as
+  // HTML so the panel header (and the diagnostic <meta name="app-
+  // version">) and the runtime CONVEX_URL never reflect stale build
+  // info even if the cache-bust query is missing or the browser
+  // somehow lands on a cached entry from an older deploy.
+  if (url.pathname.endsWith('/assets/version.js') ||
+      url.pathname.endsWith('/assets/backend-config.js')) {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req, { cache: 'no-store' });
