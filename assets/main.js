@@ -1093,6 +1093,43 @@ icFull.addEventListener('click', () => {
 document.addEventListener('fullscreenchange', applyFullscreen);
 document.addEventListener('webkitfullscreenchange', applyFullscreen);
 
+// 🏆 Highscores dialog — opens the top-100 modal. The list itself
+// re-renders every time the dialog is opened (and again whenever a
+// fresh Convex fetch lands while it's open, see _refreshHighscoresFromConvex).
+const icHighscores = document.getElementById('ic-highscores');
+const ovHs        = document.getElementById('ov-hs');
+const ovHsClose   = document.getElementById('ov-hs-close');
+function openHighscoresDialog(){
+  if(!ovHs) return;
+  renderHighscoreTable('ov-hs-table', { limit: HS_MAX_DIALOG, withTime: true });
+  ovHs.classList.remove('hidden');
+  // Trigger a fresh Convex fetch when on Vercel so the dialog
+  // shows the most up-to-date 100 (the boot-time fetch may have
+  // been raced by recently-submitted scores from other players).
+  if(useConvexHighscores) _refreshHighscoresFromConvex();
+}
+function closeHighscoresDialog(){
+  if(ovHs) ovHs.classList.add('hidden');
+}
+if(icHighscores){
+  icHighscores.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openHighscoresDialog();
+  });
+}
+if(ovHsClose) ovHsClose.addEventListener('click', closeHighscoresDialog);
+if(ovHs){
+  // Click on the dim backdrop (but not on the card) closes the dialog.
+  ovHs.addEventListener('click', (e) => {
+    if(e.target === ovHs) closeHighscoresDialog();
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape' && ovHs && !ovHs.classList.contains('hidden')){
+    closeHighscoresDialog();
+  }
+});
+
 const tFruits = document.getElementById('t-fruits');
 const lFruits = document.getElementById('l-fruits');
 let fruitsMode = true;
@@ -1576,7 +1613,15 @@ function togglePause(){
 //   END    — game just ended, name handled (or didn't qualify): show board
 let gameState = 'START';
 const HS_KEY = 'sloth-safari-hs-v1';
-const HS_MAX = 8;
+// Two caps:
+//   * HS_MAX_BOARD  — rows shown on the start screen + the
+//                     game-over end screen.
+//   * HS_MAX_DIALOG — rows shown in the trophy 🏆 dialog (top-100).
+// The single `highscores` array stores up to HS_MAX_DIALOG entries;
+// renderHighscoreTable() takes a `limit` to trim per surface.
+const HS_MAX_BOARD  = 10;
+const HS_MAX_DIALOG = 100;
+const HS_MAX        = HS_MAX_DIALOG;   // legacy alias used elsewhere
 let highscores = [];
 
 // ── HIGHSCORE BACKEND ────────────────────────────────────
@@ -1610,8 +1655,12 @@ async function _refreshHighscoresFromConvex(){
     highscores = rows.map((r) => ({
       name: r.name, score: r.score, date: r.date,
     }));
-    if(document.getElementById('ov-start-hs')) renderHighscoreTable('ov-start-hs');
-    if(document.getElementById('ov-end-hs'))   renderHighscoreTable('ov-end-hs', score);
+    if(document.getElementById('ov-start-hs')) renderHighscoreTable('ov-start-hs', { limit: HS_MAX_BOARD });
+    if(document.getElementById('ov-end-hs'))   renderHighscoreTable('ov-end-hs', { limit: HS_MAX_BOARD, highlightTopOf: score });
+    if(document.getElementById('ov-hs-table') &&
+       !document.getElementById('ov-hs').classList.contains('hidden')){
+      renderHighscoreTable('ov-hs-table', { limit: HS_MAX_DIALOG, withTime: true });
+    }
   } catch(e){ console.warn('Convex highscores fetch failed:', e); }
 }
 
@@ -5281,20 +5330,53 @@ function _endGame(win, reason = ''){
   sloth = null;
 }
 
-// Render the leaderboard inside an existing element id, optionally
-// highlighting the most recently inserted row.
-function renderHighscoreTable(targetId, highlightTopOf){
+// Format a UNIX-ms timestamp as a short relative string. The
+// scale jumps to the largest unit that fits, matching everyday
+// shorthand: "just now", "5m ago", "3h ago", "11d ago", "8mo ago",
+// "1y 3m ago". Used by the top-100 highscores dialog.
+function formatRelative(ts){
+  if(!ts || isNaN(ts)) return '';
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if(s < 60)        return 'just now';
+  if(s < 3600)      return Math.floor(s / 60)    + 'm ago';
+  if(s < 86400)     return Math.floor(s / 3600)  + 'h ago';
+  if(s < 86400*30)  return Math.floor(s / 86400) + 'd ago';
+  if(s < 86400*365) return Math.floor(s / (86400*30)) + 'mo ago';
+  const y  = Math.floor(s / (86400*365));
+  const mo = Math.floor((s - y*86400*365) / (86400*30));
+  return mo > 0 ? (y + 'y ' + mo + 'm ago') : (y + 'y ago');
+}
+
+// Render the leaderboard inside an existing element id.
+// opts:
+//   highlightTopOf — score of the just-inserted row to highlight.
+//   limit          — clamp visible rows (defaults to all).
+//   withTime       — render a relative-time WHEN column (used by the
+//                    top-100 dialog; the small start/end boards keep
+//                    the compact 3-column layout).
+function renderHighscoreTable(targetId, optsOrHighlight){
+  // Back-compat: original signature was (targetId, highlightTopOf).
+  const opts = (optsOrHighlight && typeof optsOrHighlight === 'object')
+    ? optsOrHighlight
+    : { highlightTopOf: optsOrHighlight };
   const el = document.getElementById(targetId);
   if(!el) return;
-  if(highscores.length === 0){
+  const rows = highscores.slice(0, opts.limit || highscores.length);
+  if(rows.length === 0){
     el.innerHTML = '<div class="hs-empty">No scores yet — be the first!</div>';
     return;
   }
-  let html = '<table class="hs-table"><tr><th>#</th><th>NAME</th><th class="pts">SCORE</th></tr>';
-  for(let i = 0; i < highscores.length; i++){
-    const h = highscores[i];
-    const me = (highlightTopOf && h.score === highlightTopOf && h.name === lastInsertedName) ? ' me' : '';
-    html += `<tr class="${me}"><td class="rank">${i+1}</td><td class="name">${escapeHtml(h.name)}</td><td class="pts">${h.score}</td></tr>`;
+  const head = opts.withTime
+    ? '<tr><th>#</th><th>NAME</th><th class="pts">SCORE</th><th class="when">WHEN</th></tr>'
+    : '<tr><th>#</th><th>NAME</th><th class="pts">SCORE</th></tr>';
+  let html = '<table class="hs-table">' + head;
+  for(let i = 0; i < rows.length; i++){
+    const h = rows[i];
+    const me = (opts.highlightTopOf && h.score === opts.highlightTopOf && h.name === lastInsertedName) ? ' me' : '';
+    const when = opts.withTime
+      ? `<td class="when">${escapeHtml(formatRelative(h.date))}</td>`
+      : '';
+    html += `<tr class="${me}"><td class="rank">${i+1}</td><td class="name">${escapeHtml(h.name)}</td><td class="pts">${h.score}</td>${when}</tr>`;
   }
   html += '</table>';
   el.innerHTML = html;
@@ -5313,7 +5395,7 @@ const ovEnd   = document.getElementById('ov-end');
 
 function showStart(){
   gameState = 'START';
-  renderHighscoreTable('ov-start-hs');
+  renderHighscoreTable('ov-start-hs', { limit: HS_MAX_BOARD });
   ovStart.classList.remove('hidden');
   ovName.classList.add('hidden');
   ovEnd.classList.add('hidden');
@@ -5349,7 +5431,7 @@ function showEndScreen(){
   document.getElementById('ov-end-score').textContent = 'SCORE ' + score;
   const bonusEl = document.getElementById('ov-end-bonus');
   bonusEl.textContent = livesBonusGiven > 0 ? ('Includes lives bonus +' + livesBonusGiven) : '';
-  renderHighscoreTable('ov-end-hs', score);
+  renderHighscoreTable('ov-end-hs', { limit: HS_MAX_BOARD, highlightTopOf: score });
   ovEnd.classList.remove('hidden');
   ovStart.classList.add('hidden');
   ovName.classList.add('hidden');
@@ -6517,7 +6599,7 @@ applyFruits(); // fruits ON by default
 // Render the start-screen highscore table on first load too so the
 // "no scores yet" message shows for fresh players (renderHighscoreTable
 // otherwise only ran on between-runs returns to the start screen).
-renderHighscoreTable('ov-start-hs');
+renderHighscoreTable('ov-start-hs', { limit: HS_MAX_BOARD });
 // Apply the 11.5-month sleep-starvation calibration once on load so the
 // game starts with the realistic sloth-metabolism setting (≈0.23x at
 // default dayPace=1). Done here so all referenced constants (DAY_CYCLE_S
