@@ -1,8 +1,11 @@
 # A Sloth's Life
 
 [![Deploy to GitHub Pages](https://github.com/blurayne/slothlife/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/blurayne/slothlife/actions/workflows/deploy-pages.yml)
+[![Deploy to Vercel + Convex](https://github.com/blurayne/slothlife/actions/workflows/deploy-vercel.yml/badge.svg)](https://github.com/blurayne/slothlife/actions/workflows/deploy-vercel.yml)
 
-> ▶ **Play it now: <https://blurayne.github.io/slothlife/>**
+> ▶ **Play it now**
+> - GitHub Pages: <https://blurayne.github.io/slothlife/> *(per-browser highscores)*
+> - Vercel:       <https://slothlife-r78rovttf-blurayne.vercel.app/> *(shared Convex highscores)*
 
 A tiny browser game: guide a sloth through a windswept tree, swing
 between branches, eat leaves and apples, sleep through the lean
