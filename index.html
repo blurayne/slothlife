@@ -166,9 +166,11 @@
 
 <div id="panel" class="hidden locked">
   <div class="pversion js-version"></div>
-  <div class="prow"><span class="pname"></span>
-    <button id="b-refresh" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">↻ RELOAD</button>
-    <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">⟲ RESTART</button></div>
+  <!-- RELOAD is a dev-only debugging shortcut (clears the SW cache
+       + reloads). Hidden behind dev-mode so a normal player isn't
+       tempted to nuke their session by accident. -->
+  <div class="prow dev-only"><span class="pname"></span>
+    <button id="b-refresh" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">↻ RELOAD</button></div>
 
   <!-- Player-mode rows (always visible). The .dev-only sections
        below are hidden whenever #panel.locked. -->
@@ -290,6 +292,11 @@
     <input type="range" id="s-reachTime" min="0.3" max="3" step="0.1" value="2">
     <span class="pval" id="v-reachTime">2.0</span></div>
   </div><!-- /.dev-only -->
+
+  <!-- RESTART always visible; bottom of the panel so the
+       destructive action sits at the end of the scroll. -->
+  <div class="prow"><span class="pname"></span>
+    <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">⟲ RESTART</button></div>
 </div>
 
 <div id="scanlines"></div>
