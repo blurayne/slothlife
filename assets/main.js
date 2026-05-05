@@ -306,26 +306,36 @@ applyPanelState();
   const join = (...a) => a.filter(Boolean).join(' · ');
 
   const headLine  = join(partEnv, partVer);              // dev panel top
-  const tailLine  = join(partBld, partDate, partSha);    // dev panel bottom
+  // Dev panel bottom: build N on its own line, date · SHA below.
+  // Splitting by build vs. date+sha keeps the volatile timestamp
+  // grouped with the SHA (the two bits a bug-reporter needs).
+  const tailTop  = partBld;                              // line 1
+  const tailBot  = join(partDate, partSha);              // line 2
   const allBottom = join(partEnv, partVer,
                          partBld, partDate, partSha);    // player panel bottom
   const stackTop  = join(partEnv, partVer, partBld);     // start screen line 1
   const stackBot  = join(partDate, partSha);             // start screen line 2
 
+  // Helper: render a possibly-two-line stamp by splitting "top"
+  // and "bot" with a real <br>, skipping either if empty.
+  const renderStack = (el, top, bot) => {
+    el.textContent = '';
+    if(top) el.appendChild(document.createTextNode(top));
+    if(top && bot) el.appendChild(document.createElement('br'));
+    if(bot) el.appendChild(document.createTextNode(bot));
+  };
+
   document.querySelectorAll('.js-version-top').forEach((el) => {
     el.textContent = headLine;
   });
   document.querySelectorAll('.js-version-bottom').forEach((el) => {
-    el.textContent = tailLine;
+    renderStack(el, tailTop, tailBot);
   });
   document.querySelectorAll('.js-version-allbottom').forEach((el) => {
     el.textContent = allBottom;
   });
   document.querySelectorAll('.js-version-stack').forEach((el) => {
-    el.textContent = '';
-    if(stackTop) el.appendChild(document.createTextNode(stackTop));
-    if(stackTop && stackBot) el.appendChild(document.createElement('br'));
-    if(stackBot) el.appendChild(document.createTextNode(stackBot));
+    renderStack(el, stackTop, stackBot);
   });
   // Back-compat for any leftover `.js-version` element — render the
   // full single-line stamp (matches the previous behaviour).
