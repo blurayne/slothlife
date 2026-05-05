@@ -130,15 +130,22 @@ function applyPanelState(){
   document.body.classList.toggle('panel-open', panelOpen);
 }
 
-// Long-press detection: pointerdown starts a rAF loop that fills the
-// `--hold` CSS var (0..1) on the gear. After DEVMODE_HOLD_MS the
-// dev-mode flag flips and `holdFired` is set so the trailing
-// pointerup doesn't also toggle the panel. Movement > 12 px or
-// pointerup before threshold cancels.
-const DEVMODE_HOLD_MS = 2000;
-const HOLD_CANCEL_PX  = 12;
+// Long-press detection: pointerdown starts a rAF loop that ticks
+// the `--hold` CSS var (0..1) on the gear. After DEVMODE_HOLD_MS
+// the dev-mode flag flips. Movement > 12 px or pointerup before
+// threshold cancels.
+//
+// Rather than a boolean "hold-fired" flag (which could get stuck
+// at true if a sequence of events drops a click), we record the
+// timestamp of the last successful long-press and have the click
+// handler suppress itself only inside a short window after that.
+// Auto-recovers from any weird state — even if a fire-then-no-click
+// happens, the next click 700 ms later still toggles the panel.
+const DEVMODE_HOLD_MS    = 2000;
+const HOLD_CANCEL_PX     = 12;
+const HOLD_CLICK_GUARD_MS = 700;
 let _holdRaf = 0, _holdStart = 0, _holdPointerId = null;
-let _holdStartXY = null, _holdFired = false;
+let _holdStartXY = null, _lastHoldFireT = -Infinity;
 function _setHoldVar(t){
   icSettings.style.setProperty('--hold', String(Math.min(1, t)));
 }
@@ -147,7 +154,7 @@ function _holdTick(){
   const t = (performance.now() - _holdStart) / DEVMODE_HOLD_MS;
   _setHoldVar(t);
   if(t >= 1){
-    _holdFired = true;
+    _lastHoldFireT = performance.now();
     _holdEnd();
     toggleDevMode();
     return;
@@ -155,7 +162,6 @@ function _holdTick(){
   _holdRaf = requestAnimationFrame(_holdTick);
 }
 function _holdBegin(e){
-  _holdFired = false;
   _holdStart = performance.now();
   _holdPointerId = e.pointerId;
   _holdStartXY = { x: e.clientX, y: e.clientY };
@@ -217,10 +223,11 @@ icSettings.addEventListener('pointerleave',  () => _holdEnd());
 
 icSettings.addEventListener('click', (e) => {
   e.stopPropagation();   // don't let the document handler immediately close it
-  if(_holdFired){        // long-press already toggled devMode + panel
-    _holdFired = false;
-    return;
-  }
+  // Suppress this click only if a long-press toggle just fired —
+  // bounded by a short window so a stale flag can never wedge the
+  // gear permanently. After HOLD_CLICK_GUARD_MS the next click
+  // toggles the panel as normal.
+  if(performance.now() - _lastHoldFireT < HOLD_CLICK_GUARD_MS) return;
   panelOpen = !panelOpen;
   applyPanelState();
 });
