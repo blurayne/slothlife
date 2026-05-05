@@ -373,7 +373,9 @@ const scanlines   = document.getElementById('scanlines');
 let pixelMode = false;
 let slothMode = true;
 let blurBgMode = true;
-let sunShadeMode = false;
+// Default ON so the new 3x sun-shade pass is visible immediately;
+// players who dislike it can still toggle it off from dev mode.
+let sunShadeMode = true;
 // Per-frame sun-light direction, recomputed in frame(). -1 = sun on
 // the far left, +1 = sun on the far right, 0 = sun directly overhead
 // (or SUN SHADE off / raining / sun below the horizon).
