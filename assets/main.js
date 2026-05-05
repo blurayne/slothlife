@@ -101,6 +101,12 @@ sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
     if(onChange === 'grass'){ makeGrassBlades(); }
     if(onChange === 'musicVol'){ Audio.applyVolumes(); }
     if(onChange === 'fxVol'){ Audio.applyVolumes(); }
+    // Persist player-mode sliders so a returning visitor finds the
+    // volumes / pixel size they set last time. Dev-only knobs are
+    // intentionally not saved.
+    if(id === 'pixelSize' || id === 'musicVol' || id === 'fxVol'){
+      if(typeof savePlayerPrefs === 'function') savePlayerPrefs();
+    }
   });
 });
 
@@ -500,10 +506,10 @@ function applyWeight(){
   tWeight.classList.toggle('on', weightMode);
   lWeight.textContent = weightMode ? 'ON' : 'OFF';
 }
-tPixel.addEventListener('click', ()=>{ pixelMode = !pixelMode; applyPixel(); });
+tPixel.addEventListener('click', ()=>{ pixelMode = !pixelMode; applyPixel(); savePlayerPrefs(); });
 tSloth.addEventListener('click', ()=>{ slothMode = !slothMode; applySloth(); });
-tBlurBg.addEventListener('click', ()=>{ blurBgMode = !blurBgMode; applyBlurBg(); });
-tSunShade.addEventListener('click', ()=>{ sunShadeMode = !sunShadeMode; applySunShade(); });
+tBlurBg.addEventListener('click', ()=>{ blurBgMode = !blurBgMode; applyBlurBg(); savePlayerPrefs(); });
+tSunShade.addEventListener('click', ()=>{ sunShadeMode = !sunShadeMode; applySunShade(); savePlayerPrefs(); });
 tSunShadow.addEventListener('click', ()=>{ sunShadowMode = !sunShadowMode; applySunShadow(); });
 tWeight.addEventListener('click', ()=>{ weightMode = !weightMode; applyWeight(); });
 
@@ -1143,6 +1149,7 @@ if(bTrack){
   bTrack.addEventListener('click', () => {
     Audio.nextTrack();
     refreshTrackLabel();
+    savePlayerPrefs();
   });
 }
 
@@ -1268,7 +1275,7 @@ function applyTimeLeft(){
   hudWind.classList.toggle('hidden',   timeLeftMode);
   hudTleft.classList.toggle('hidden', !timeLeftMode);
 }
-tTleft.addEventListener('click', () => { timeLeftMode = !timeLeftMode; applyTimeLeft(); });
+tTleft.addEventListener('click', () => { timeLeftMode = !timeLeftMode; applyTimeLeft(); savePlayerPrefs(); });
 
 // Format real-world seconds as a compact "~N min" / "~Nh M" tag. We
 // use the tilde because the estimate can drift if the player tweaks
@@ -1304,7 +1311,7 @@ const seasonsMode = true;
 
 // SHUFFLE button → randomise background theme
 const bRandomize = document.getElementById('b-randomize');
-bRandomize.addEventListener('click', ()=>{ randomizeBg(); });
+bRandomize.addEventListener('click', ()=>{ nextBg(); savePlayerPrefs(); });
 
 // 11.5 MO SLEEP calibration button.
 // Sets HUNGER PACE so the sleeping sloth would starve in ~5.75 in-game
@@ -5019,10 +5026,11 @@ function setBgTheme(name){
   if(el) el.textContent = name;
 }
 
-function randomizeBg(){
-  // pick a different theme than the current one
-  const opts = BG_THEMES.filter(n => n !== bgTheme);
-  setBgTheme(opts[Math.floor(Math.random() * opts.length)]);
+function nextBg(){
+  // Cycle to the next theme in BG_THEMES (wraps). Sequential
+  // instead of random so repeat presses are predictable.
+  const i = BG_THEMES.indexOf(bgTheme);
+  setBgTheme(BG_THEMES[(i + 1) % BG_THEMES.length]);
 }
 
 // ── MOUNTAINS — three jagged silhouette layers ──
@@ -6770,7 +6778,68 @@ function frame(ts){
   requestAnimationFrame(frame);
 }
 
+// Persist the player-mode panel state so a returning visitor finds
+// the look they configured last time. Dev-mode-only knobs (physics
+// sliders, season toggles, …) are intentionally NOT saved — those
+// reset to their hard-coded defaults on every visit.
+const PLAYER_PREFS_KEY = 'sloth-player-prefs';
+function savePlayerPrefs(){
+  try {
+    localStorage.setItem(PLAYER_PREFS_KEY, JSON.stringify({
+      pixelMode,
+      pixelSize:    P.pixelSize,
+      blurBgMode,
+      sunShadeMode,
+      timeLeftMode,
+      bgTheme,
+      musicVol:     P.musicVol,
+      fxVol:        P.fxVol,
+      trackIdx:     Audio._musicIndex,
+    }));
+  } catch(_){}
+}
+function loadPlayerPrefs(){
+  let p = {};
+  try {
+    const raw = localStorage.getItem(PLAYER_PREFS_KEY);
+    p = raw ? (JSON.parse(raw) || {}) : {};
+  } catch(_){ p = {}; }
+
+  if(typeof p.pixelMode    === 'boolean') pixelMode    = p.pixelMode;
+  if(typeof p.blurBgMode   === 'boolean') blurBgMode   = p.blurBgMode;
+  if(typeof p.sunShadeMode === 'boolean') sunShadeMode = p.sunShadeMode;
+  if(typeof p.timeLeftMode === 'boolean') timeLeftMode = p.timeLeftMode;
+
+  // Sliders: update P + the slider <input> + the value label so the
+  // panel reads the saved number instead of the HTML default.
+  const setSlider = (id, val, fmt) => {
+    if(typeof val !== 'number' || !isFinite(val)) return;
+    P[id] = val;
+    const el  = document.getElementById('s-' + id);
+    const lbl = document.getElementById('v-' + id);
+    if(el)  el.value = String(val);
+    if(lbl) lbl.textContent = fmt(val);
+  };
+  setSlider('pixelSize', p.pixelSize, v => v.toFixed(0));
+  setSlider('musicVol',  p.musicVol,  v => Math.round(v * 100) + '%');
+  setSlider('fxVol',     p.fxVol,     v => Math.round(v * 100) + '%');
+
+  if(typeof p.bgTheme === 'string' && BG_THEMES.indexOf(p.bgTheme) >= 0){
+    setBgTheme(p.bgTheme);
+  }
+  if(typeof p.trackIdx === 'number'){
+    Audio.setTrack(p.trackIdx);
+    refreshTrackLabel();
+  }
+  // Make sure the audio mixer applies the loaded vols immediately.
+  Audio.applyVolumes();
+}
+
 init();
+// Restore any saved player-mode prefs from a previous visit before
+// the apply* calls below — they will then mirror the loaded values
+// to the DOM. Dev-mode-only state is intentionally not persisted.
+loadPlayerPrefs();
 applyPixel();   // ensure scanline state matches initial pixelMode
 applySloth();
 applySound();   // sound starts OFF — needs user gesture to enable
