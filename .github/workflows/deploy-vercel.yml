@@ -1,0 +1,112 @@
+# Optional Vercel + Convex deploy. Runs alongside the GitHub Pages
+# workflow on every push to main, but each step is *gated on the
+# matching repository secret* — if the secret is missing, the step
+# emits a workflow-level warning and skips. So the repo can stay
+# Pages-only by default; flipping it on means setting the secrets.
+name: Deploy to Vercel + Convex
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Gate on required secrets
+        id: gate
+        env:
+          VERCEL_TOKEN:       ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID:      ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID:  ${{ secrets.VERCEL_PROJECT_ID }}
+          CONVEX_DEPLOY_KEY:  ${{ secrets.CONVEX_DEPLOY_KEY }}
+          CONVEX_URL:         ${{ secrets.CONVEX_URL }}
+        run: |
+          set -u
+          missing_vercel=""
+          [ -z "${VERCEL_TOKEN:-}" ]      && missing_vercel="$missing_vercel VERCEL_TOKEN"
+          [ -z "${VERCEL_ORG_ID:-}" ]     && missing_vercel="$missing_vercel VERCEL_ORG_ID"
+          [ -z "${VERCEL_PROJECT_ID:-}" ] && missing_vercel="$missing_vercel VERCEL_PROJECT_ID"
+          if [ -n "$missing_vercel" ]; then
+            echo "::warning title=Vercel deploy skipped::Missing repo secrets:$missing_vercel — see README › Vercel setup."
+            echo "skip_vercel=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_vercel=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -z "${CONVEX_DEPLOY_KEY:-}" ]; then
+            echo "::warning title=Convex deploy skipped::CONVEX_DEPLOY_KEY secret not set — see README › Convex setup."
+            echo "skip_convex=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_convex=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -z "${CONVEX_URL:-}" ]; then
+            echo "::warning title=CONVEX_URL not set::Frontend on Vercel will fall back to localStorage (no shared highscores)."
+          fi
+
+      - name: Setup Node
+        if: steps.gate.outputs.skip_vercel == 'false' || steps.gate.outputs.skip_convex == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        if: steps.gate.outputs.skip_vercel == 'false' || steps.gate.outputs.skip_convex == 'false'
+        run: npm install --no-audit --no-fund
+
+      - name: Deploy Convex functions
+        if: steps.gate.outputs.skip_convex == 'false'
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: npx convex deploy --yes
+
+      - name: Stamp version.js + backend-config.js + cache-bust HTML
+        if: steps.gate.outputs.skip_vercel == 'false'
+        env:
+          CONVEX_URL: ${{ secrets.CONVEX_URL }}
+        run: |
+          set -euo pipefail
+          {
+            echo "window.APP_VERSION = '${{ github.ref_name }}';"
+            echo "window.APP_BUILD   = '${{ github.run_number }}';"
+            echo "window.APP_DATE    = '$(date -u +%Y-%m-%dT%H:%M:%SZ)';"
+            echo "window.APP_SHA     = '${{ github.sha }}';"
+          } > assets/version.js
+          {
+            echo "// Stamped by .github/workflows/deploy-vercel.yml at deploy time."
+            echo "window.CONVEX_URL = '${CONVEX_URL:-}';"
+          } > assets/backend-config.js
+          sed -i \
+            -e "s/?v=dev/?v=${{ github.sha }}/g" \
+            -e "s/name=\"app-version\" content=\"dev\"/name=\"app-version\" content=\"${{ github.sha }}\"/" \
+            index.html
+          echo "--- assets/version.js ---";        cat assets/version.js
+          echo "--- assets/backend-config.js ---"; cat assets/backend-config.js
+
+      - name: Pull Vercel project settings
+        if: steps.gate.outputs.skip_vercel == 'false'
+        env:
+          VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build for Vercel
+        if: steps.gate.outputs.skip_vercel == 'false'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy prebuilt to Vercel
+        if: steps.gate.outputs.skip_vercel == 'false'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
