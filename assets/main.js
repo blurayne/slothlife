@@ -260,16 +260,15 @@ applyPanelState();
 //                   branch ref like 'main' / 'dev' is omitted.
 //   * build N, ISO date, short SHA → rendered when present.
 //
-// Three slots, each fed by the same parts but joined differently:
-//   .js-version-top     — settings panel header. Identity only:
-//                         env [+ version]. The volatile build-time
-//                         metadata moves out of the player's eye.
-//   .js-version-bottom  — settings panel footer. Build / date /
-//                         SHA — the bits a developer actually needs
-//                         when filing a bug.
-//   .js-version-stack   — start-screen footer. All five parts, with
-//                         a line break after `build N` so the
-//                         identity sits on its own line.
+// All version-stamp slots share a single two-line layout:
+//   line 1: env · vX.Y.Z · build N
+//   line 2: 2026-05-05 20:00 UTC +01:00 · abcdef0
+// rendered via a real <br>. Either line is omitted when empty,
+// and the :empty CSS rules zero spacing if both are blank
+// (local dev). Slots:
+//   .js-version-top       — dev panel, directly below title.
+//   .js-version-allbottom — player panel, bottom (below RESTART).
+//   .js-version-stack     — start-screen footer.
 {
   const env  = String(window.APP_ENV     || '').trim();
   const ver  = String(window.APP_VERSION || '').trim();
@@ -305,19 +304,17 @@ applyPanelState();
   const partSha  = (sha && sha !== 'unknown') ? sha.slice(0, 7) : '';
   const join = (...a) => a.filter(Boolean).join(' · ');
 
-  const headLine  = join(partEnv, partVer);              // dev panel top
-  // Dev panel bottom: build N on its own line, date · SHA below.
-  // Splitting by build vs. date+sha keeps the volatile timestamp
-  // grouped with the SHA (the two bits a bug-reporter needs).
-  const tailTop  = partBld;                              // line 1
-  const tailBot  = join(partDate, partSha);              // line 2
-  const allBottom = join(partEnv, partVer,
-                         partBld, partDate, partSha);    // player panel bottom
-  const stackTop  = join(partEnv, partVer, partBld);     // start screen line 1
-  const stackBot  = join(partDate, partSha);             // start screen line 2
+  // Unified two-line stamp used everywhere a version string is
+  // shown: dev-panel top (below the DEVELOPER SETTINGS title),
+  // player-panel bottom (below RESTART), and the start-screen
+  // footer. Line 1 is the "identity" — env + semver + build N,
+  // line 2 is the "build snapshot" — local-time date + short SHA.
+  const stampTop = join(partEnv, partVer, partBld);
+  const stampBot = join(partDate, partSha);
 
   // Helper: render a possibly-two-line stamp by splitting "top"
-  // and "bot" with a real <br>, skipping either if empty.
+  // and "bot" with a real <br>, skipping either if empty so the
+  // :empty CSS rule can still zero spacing in local dev.
   const renderStack = (el, top, bot) => {
     el.textContent = '';
     if(top) el.appendChild(document.createTextNode(top));
@@ -325,17 +322,8 @@ applyPanelState();
     if(bot) el.appendChild(document.createTextNode(bot));
   };
 
-  document.querySelectorAll('.js-version-top').forEach((el) => {
-    el.textContent = headLine;
-  });
-  document.querySelectorAll('.js-version-bottom').forEach((el) => {
-    renderStack(el, tailTop, tailBot);
-  });
-  document.querySelectorAll('.js-version-allbottom').forEach((el) => {
-    el.textContent = allBottom;
-  });
-  document.querySelectorAll('.js-version-stack').forEach((el) => {
-    renderStack(el, stackTop, stackBot);
+  document.querySelectorAll('.js-version-top, .js-version-allbottom, .js-version-stack').forEach((el) => {
+    renderStack(el, stampTop, stampBot);
   });
   // Back-compat for any leftover `.js-version` element — render the
   // full single-line stamp (matches the previous behaviour).

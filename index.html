@@ -313,15 +313,11 @@
   <div class="prow" style="margin-top:18px"><span class="pname"></span>
     <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">⟲ RESTART</button></div>
 
-  <!-- Two footers, one per mode. .player-only / .dev-only show
-       whichever matches; both share the .pversion-foot styling so
-       the visual is identical and only the contents differ. -->
-  <!-- Player footer: full identity in one block (env · version ·
-       build · date · SHA). -->
+  <!-- Player footer: same two-line stamp as the dev-mode top
+       row (env · version · build / date · SHA). Dev mode hides
+       this because the same stamp lives directly under the
+       DEVELOPER SETTINGS title above. -->
   <div class="pversion-foot js-version-allbottom player-only"></div>
-  <!-- Dev footer: build / date / SHA only — env + version sits at
-       the top of the dev panel under the title. -->
-  <div class="pversion-foot js-version-bottom dev-only"></div>
 </div>
 
 <div id="scanlines"></div>
