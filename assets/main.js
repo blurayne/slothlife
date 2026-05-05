@@ -49,6 +49,13 @@ const P = {
   endMonths:   30,
   musicVol:    0.75,
   fxVol:       0.57,
+  // Master multiplier on the sun-shade effect — per-branch tint,
+  // trunk gradient, and full-screen soft-light pass all scale by
+  // P.shadeStrength. 1.0 = original mild look; 3.0 (default) is the
+  // punchier rim-light. Exposed via the dev-mode SHADE STRENGTH
+  // slider; clamping happens at the call sites so values up to 6
+  // remain visually sane without blowing colours.
+  shadeStrength: 3.0,
 };
 
 // ════════════════════════════════════════════════════════
@@ -78,7 +85,8 @@ const sliderDefs = [
   { id:'endMonths',   fmt: v => v.toFixed(0) },
   { id:'grass',       fmt: v => v.toFixed(2) + 'x', onChange: 'grass' },
   { id:'musicVol',    fmt: v => Math.round(v * 100) + '%', onChange: 'musicVol' },
-  { id:'fxVol',       fmt: v => Math.round(v * 100) + '%', onChange: 'fxVol' }
+  { id:'fxVol',       fmt: v => Math.round(v * 100) + '%', onChange: 'fxVol' },
+  { id:'shadeStrength', fmt: v => v.toFixed(1) + 'x' }
 ];
 sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
   const el  = document.getElementById('s-'+id);
@@ -370,7 +378,8 @@ let sunShadeMode = false;
 // the far left, +1 = sun on the far right, 0 = sun directly overhead
 // (or SUN SHADE off / raining / sun below the horizon).
 let _sunBias = 0;
-let sunShadowMode = true;
+// Default OFF — players reported the cast shadow felt heavy at noon.
+let sunShadowMode = false;
 let weightMode = true;
 
 // Camera zoom state. worldZoom always anchors around the canvas centre;
@@ -1390,7 +1399,8 @@ class Branch {
     // side of the canvas, darken those on the shadow side. Strength
     // scales with how horizontal the sun is (|_sunBias|), so noon
     // light barely shifts anything and rake-light at sunrise/sunset
-    // makes the contrast obvious.
+    // makes the contrast obvious. P.shadeStrength multiplies the
+    // tint magnitude so the dev-mode slider can dial up plasticity.
     if(_sunBias){
       const branchCx = (this.sx + this.ex) * 0.5;
       const sideNorm = Math.max(-1, Math.min(1,
@@ -1398,12 +1408,12 @@ class Branch {
       // lit > 0 → branch on the sun side; lit < 0 → shadow side.
       const lit = sideNorm * _sunBias;
       if(lit > 0){
-        const k = lit * 0.40;
+        const k = Math.min(1, lit * 0.40 * P.shadeStrength);
         r = Math.round(r + (235 - r) * k);
         g = Math.round(g + (200 - g) * k);
         b = Math.round(b + (140 - b) * k);
       } else {
-        const k = -lit * 0.45;
+        const k = Math.min(1, -lit * 0.45 * P.shadeStrength);
         r = Math.round(r * (1 - k));
         g = Math.round(g * (1 - k));
         b = Math.round(b * (1 - k));
@@ -5532,9 +5542,13 @@ function drawSunShade(){
   const sunNx = (sun.x - W * 0.5) / (W * 0.5);
   // Strength tapers off at the horizon (low sun = soft side-light)
   // and peaks near zenith. sun.opacity already fades the whole effect
-  // around sunrise/sunset.
+  // around sunrise/sunset. P.shadeStrength scales the whole pass so
+  // the dev-mode slider drives all three shade contributions
+  // (branches, trunk, meadow) consistently. Clamped to keep the
+  // soft-light blend from punching pure black/white at high values.
   const heightFactor = 1 - Math.min(1, Math.abs(sunNx));
-  const strength = sun.opacity * (0.20 + 0.30 * heightFactor);
+  const strength = Math.min(0.95,
+    sun.opacity * (0.20 + 0.30 * heightFactor) * P.shadeStrength);
 
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
@@ -6095,21 +6109,24 @@ function drawTrunk(){
   // SUN SHADE: lay a directional warm-light → cool-shadow gradient
   // across the trunk, brightest on the sun-facing side. The clip from
   // the bark-stripe pass (a few lines down) would bound it; do it here
-  // before the clip so it covers the whole trunk fill.
+  // before the clip so it covers the whole trunk fill. P.shadeStrength
+  // multiplies the gradient alphas so the dev-mode slider scales the
+  // trunk plasticity in lock-step with the branch + meadow passes.
   if(_sunBias){
     ctx.save();
     ctx.clip();
     const sg = ctx.createLinearGradient(trunkBX-bw, 0, trunkBX+bw, 0);
+    const ss = P.shadeStrength;
     if(_sunBias > 0){
       // Sun on the right → highlight right edge, shadow left edge.
-      sg.addColorStop(0,   `rgba(0,0,0,${0.30 * _sunBias})`);
+      sg.addColorStop(0,   `rgba(0,0,0,${Math.min(1, 0.30 * _sunBias * ss)})`);
       sg.addColorStop(0.5, 'rgba(0,0,0,0)');
-      sg.addColorStop(1,   `rgba(255,225,170,${0.32 * _sunBias})`);
+      sg.addColorStop(1,   `rgba(255,225,170,${Math.min(1, 0.32 * _sunBias * ss)})`);
     } else {
       const k = -_sunBias;
-      sg.addColorStop(0,   `rgba(255,225,170,${0.32 * k})`);
+      sg.addColorStop(0,   `rgba(255,225,170,${Math.min(1, 0.32 * k * ss)})`);
       sg.addColorStop(0.5, 'rgba(0,0,0,0)');
-      sg.addColorStop(1,   `rgba(0,0,0,${0.30 * k})`);
+      sg.addColorStop(1,   `rgba(0,0,0,${Math.min(1, 0.30 * k * ss)})`);
     }
     ctx.fillStyle = sg;
     ctx.fillRect(trunkBX - bw - 2, topY - 4, bw * 2 + 4, trunkBY - topY + 14);
