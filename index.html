@@ -177,13 +177,13 @@
   <div class="psec">PLAYER</div>
   <div class="ptog-row"><span class="pname">PIXELIZE</span>
     <div class="tog" id="t-pixel"></div><span class="tlbl" id="l-pixel">OFF</span></div>
+  <div class="prow"><span class="pname">PIXEL SIZE</span>
+    <input type="range" id="s-pixelSize" min="2" max="12" step="1" value="3">
+    <span class="pval" id="v-pixelSize">3</span></div>
   <div class="ptog-row"><span class="pname">BLUR BG</span>
     <div class="tog on" id="t-blurbg"></div><span class="tlbl" id="l-blurbg">ON</span></div>
   <div class="ptog-row"><span class="pname">TIME LEFT</span>
     <div class="tog" id="t-tleft"></div><span class="tlbl" id="l-tleft">OFF</span></div>
-  <div class="prow"><span class="pname">PIXEL SIZE</span>
-    <input type="range" id="s-pixelSize" min="2" max="12" step="1" value="3">
-    <span class="pval" id="v-pixelSize">3</span></div>
   <div class="prow"><span class="pname">BACKGROUND</span>
     <span class="pval" id="v-bg" style="text-align:left;flex:1;">PLAINS</span></div>
   <div class="prow"><span class="pname">RANDOMIZE</span>
@@ -294,8 +294,10 @@
   </div><!-- /.dev-only -->
 
   <!-- RESTART always visible; bottom of the panel so the
-       destructive action sits at the end of the scroll. -->
-  <div class="prow"><span class="pname"></span>
+       destructive action sits at the end of the scroll. Extra
+       top margin separates it from the last content row above
+       (varies between PLAYER and dev modes). -->
+  <div class="prow" style="margin-top:18px"><span class="pname"></span>
     <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">⟲ RESTART</button></div>
 </div>
 
