@@ -5,7 +5,7 @@
 
 > ▶ **Play it now**
 > - GitHub Pages: <https://blurayne.github.io/slothlife/> *(per-browser highscores)*
-> - Vercel:       <https://project-zmwcv.vercel.app/?refresh=mot2cf0z> *(shared Convex highscores)*
+> - Vercel:       <https://slothlife.vercel.app/> *(shared Convex highscores)*
 
 A tiny browser game: guide a sloth through a windswept tree, swing
 between branches, eat leaves and apples, sleep through the lean
