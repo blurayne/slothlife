@@ -6643,6 +6643,16 @@ applyPixel();   // ensure scanline state matches initial pixelMode
 applySloth();
 applySound();   // sound starts OFF — needs user gesture to enable
 applyFruits(); // fruits ON by default
+// Mirror the rest of the dev-only toggles to their JS defaults so a
+// stale cached index.html (or any future drift between the HTML
+// "tog/on" markup and the JS variable) can't make the visual lie
+// about the actual state.
+applyBlurBg();
+applySunShade();
+applySunShadow();
+applyWeight();
+applyDayauto();
+applyRain();
 // Render the start-screen highscore table on first load too so the
 // "no scores yet" message shows for fresh players (renderHighscoreTable
 // otherwise only ran on between-runs returns to the start screen).
