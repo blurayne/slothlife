@@ -146,15 +146,45 @@ unaffected if `vercel-convex` is empty or missing entirely.
    Vercel's built-in deploy can't do those steps.
 
 2. **Set up the GitHub Actions credentials** so the workflow can
-   push to Vercel:
-   - `npm install -g vercel` (or use `npx vercel` ad-hoc).
-   - From the repo root: `vercel link`. Pick the team/project you
-     just imported; it writes `.vercel/project.json` (gitignored).
-     Copy `orgId` and `projectId`.
-   - <https://vercel.com/account/tokens> → **Create Token** → copy.
-   - In the GitHub repo: **Settings → Environments → `vercel-convex`**
-     (create it if it doesn't exist) → **Add environment secret** for
-     each of `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+   push to Vercel.
+
+   **a. Generate the API token.** <https://vercel.com/account/tokens>
+   → **Create Token** → name it (e.g. `slothlife-ci`) → set scope
+   to the right team if you have multiple → copy the value. This is
+   `VERCEL_TOKEN`.
+
+   **b. Get `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID`.** Two equivalent
+   ways — pick one:
+
+   - **Via the CLI** (recommended; one command, no clicking):
+     ```bash
+     npm install -g vercel        # or use npx vercel ad-hoc
+     npx vercel login             # opens a browser, links the CLI
+     npx vercel link              # pick the team/scope, then the
+                                  # project you imported in step 1
+     cat .vercel/project.json
+     ```
+     The output looks like:
+     ```json
+     {
+       "orgId":     "team_XXXXXXXXXXXXXXXX",
+       "projectId": "prj_XXXXXXXXXXXXXXXX"
+     }
+     ```
+     `.vercel/` is already in `.gitignore`, so it stays out of the repo.
+
+   - **Via the dashboard** (no CLI):
+     `VERCEL_ORG_ID` is your account's **Team ID** (or **Your ID** for
+     a personal account). Open <https://vercel.com/dashboard>, click
+     the team/account name in the top-left, then **Settings → General
+     → Team ID** (or **Your ID**). Copy that string.
+     `VERCEL_PROJECT_ID` lives on the project's **Settings → General
+     → Project ID** page.
+
+   **c. Paste each value into the `vercel-convex` environment.** In
+   the GitHub repo: **Settings → Environments → `vercel-convex`**
+   (create it if it doesn't exist) → **Add environment secret** for
+   each of `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
 
 3. Push to `main` (or run **Deploy to Vercel + Convex** from the
    Actions tab). The first deploy publishes the Vercel project's
