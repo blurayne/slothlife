@@ -51,11 +51,11 @@ const P = {
   fxVol:       0.57,
   // Master multiplier on the sun-shade effect — per-branch tint,
   // trunk gradient, and full-screen soft-light pass all scale by
-  // P.shadeStrength. 1.0 = original mild look; 3.0 (default) is the
-  // punchier rim-light. Exposed via the dev-mode SHADE STRENGTH
-  // slider; clamping happens at the call sites so values up to 6
-  // remain visually sane without blowing colours.
-  shadeStrength: 3.0,
+  // P.shadeStrength. 1.0 = original mild look; 2.3 (default) is
+  // the player-facing punch. Exposed via the dev-mode SHADE
+  // STRENGTH slider; clamping happens at the call sites so values
+  // up to 6 remain visually sane without blowing colours.
+  shadeStrength: 2.3,
 };
 
 // ════════════════════════════════════════════════════════
@@ -452,11 +452,10 @@ const scanlines   = document.getElementById('scanlines');
 let pixelMode = false;
 let slothMode = true;
 let blurBgMode = true;
-// SUN SHADE defaults OFF on a fresh game — the directional pass
-// can be loud at midday and a normal player has no way to control
-// it (the toggle lives in the dev-only panel section). Anyone in
-// dev mode can flip it on and tweak SHADE STRENGTH.
-let sunShadeMode = false;
+// SUN SHADE defaults ON. The toggle lives in the player section
+// of the panel so a normal player can flip it off; SHADE STRENGTH
+// stays in dev-only for fine-tuning.
+let sunShadeMode = true;
 // Per-frame sun-light direction, recomputed in frame(). -1 = sun on
 // the far left, +1 = sun on the far right, 0 = sun directly overhead
 // (or SUN SHADE off / raining / sun below the horizon).
