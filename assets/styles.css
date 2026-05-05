@@ -126,8 +126,12 @@
   #panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:2px}
 
   /* Player vs developer mode — when #panel.locked, hide every
-     .dev-only block. Toggled by a 2.5s long-press on the gear. */
+     .dev-only block. Toggled by a 2 s long-press on the gear.
+     .player-only is the inverse: rows / titles / footers that
+     should appear only in player mode (e.g. the SETTINGS title
+     + the combined identity footer). */
   #panel.locked .dev-only{ display:none; }
+  #panel:not(.locked) .player-only{ display:none; }
 
   .ptitle{
     font-size:10px;letter-spacing:.20em;

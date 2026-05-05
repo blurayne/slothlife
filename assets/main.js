@@ -274,16 +274,21 @@ applyPanelState();
   const partSha  = (sha && sha !== 'unknown') ? sha.slice(0, 7) : '';
   const join = (...a) => a.filter(Boolean).join(' · ');
 
-  const headLine = join(partEnv, partVer);              // top of panel
-  const tailLine = join(partBld, partDate, partSha);    // bottom of panel
-  const stackTop = join(partEnv, partVer, partBld);     // start screen, line 1
-  const stackBot = join(partDate, partSha);             // start screen, line 2
+  const headLine  = join(partEnv, partVer);              // dev panel top
+  const tailLine  = join(partBld, partDate, partSha);    // dev panel bottom
+  const allBottom = join(partEnv, partVer,
+                         partBld, partDate, partSha);    // player panel bottom
+  const stackTop  = join(partEnv, partVer, partBld);     // start screen line 1
+  const stackBot  = join(partDate, partSha);             // start screen line 2
 
   document.querySelectorAll('.js-version-top').forEach((el) => {
     el.textContent = headLine;
   });
   document.querySelectorAll('.js-version-bottom').forEach((el) => {
     el.textContent = tailLine;
+  });
+  document.querySelectorAll('.js-version-allbottom').forEach((el) => {
+    el.textContent = allBottom;
   });
   document.querySelectorAll('.js-version-stack').forEach((el) => {
     el.textContent = '';

@@ -165,7 +165,14 @@
 </button>
 
 <div id="panel" class="hidden locked">
-  <div class="pversion js-version-top"></div>
+  <!-- Title swaps based on dev-mode. Both elements live in the DOM
+       at all times; CSS picks whichever matches the current mode
+       (.player-only is the inverse of .dev-only). -->
+  <div class="ptitle player-only">SETTINGS</div>
+  <div class="ptitle dev-only">DEVELOPER SETTINGS</div>
+  <!-- Env + version row — dev mode only; in player mode the same
+       string appears as the first segment of the bottom footer. -->
+  <div class="pversion js-version-top dev-only"></div>
   <!-- RELOAD is a dev-only debugging shortcut (clears the SW cache
        + reloads). Hidden behind dev-mode so a normal player isn't
        tempted to nuke their session by accident. -->
@@ -300,10 +307,15 @@
   <div class="prow" style="margin-top:18px"><span class="pname"></span>
     <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">⟲ RESTART</button></div>
 
-  <!-- Build metadata (build N · DATE · SHA7) — a player-irrelevant
-       diagnostic, sits at the absolute bottom of the panel so a
-       bug-reporter can read it off without obscuring anything. -->
-  <div class="pversion-foot js-version-bottom"></div>
+  <!-- Two footers, one per mode. .player-only / .dev-only show
+       whichever matches; both share the .pversion-foot styling so
+       the visual is identical and only the contents differ. -->
+  <!-- Player footer: full identity in one block (env · version ·
+       build · date · SHA). -->
+  <div class="pversion-foot js-version-allbottom player-only"></div>
+  <!-- Dev footer: build / date / SHA only — env + version sits at
+       the top of the dev panel under the title. -->
+  <div class="pversion-foot js-version-bottom dev-only"></div>
 </div>
 
 <div id="scanlines"></div>
