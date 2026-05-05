@@ -94,7 +94,13 @@ instead of `localStorage`, so every player on Vercel sees the same
 shared leaderboard. On GitHub Pages and on `localhost` the original
 per-browser `localStorage` flow is used.
 
-### Required repository secrets (GitHub → Settings → Secrets → Actions)
+### Required environment secrets — `vercel-convex` GitHub Actions environment
+
+The Vercel + Convex workflow runs against a single GitHub Actions
+**environment** named `vercel-convex`. Create it once under
+**Settings → Environments → New environment → `vercel-convex`**, then
+add the secrets below to that environment (not as repository-level
+secrets) so they only ever surface in jobs targeting this environment:
 
 | secret              | needed for | purpose |
 |---------------------|------------|---------|
@@ -108,6 +114,10 @@ If only the Vercel secrets are set, the site deploys to Vercel without
 shared highscores (the frontend falls back to `localStorage`). If only
 the Convex secret is set, the functions deploy but Vercel doesn't and
 no frontend reads them. Setting all five lights up the full path.
+
+The environment is **only** used by `.github/workflows/deploy-vercel.yml`;
+the GitHub Pages workflow has no environment binding and stays
+unaffected if `vercel-convex` is empty or missing entirely.
 
 ### One-time Vercel setup
 
@@ -142,9 +152,9 @@ no frontend reads them. Setting all five lights up the full path.
      just imported; it writes `.vercel/project.json` (gitignored).
      Copy `orgId` and `projectId`.
    - <https://vercel.com/account/tokens> → **Create Token** → copy.
-   - In the GitHub repo: **Settings → Secrets and variables →
-     Actions** → **New repository secret** for each of
-     `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+   - In the GitHub repo: **Settings → Environments → `vercel-convex`**
+     (create it if it doesn't exist) → **Add environment secret** for
+     each of `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
 
 3. Push to `main` (or run **Deploy to Vercel + Convex** from the
    Actions tab). The first deploy publishes the Vercel project's
@@ -161,8 +171,9 @@ no frontend reads them. Setting all five lights up the full path.
    URL into `.env.local` as `CONVEX_URL`. Copy that value.
 4. <https://dashboard.convex.dev> → your project → **Settings →
    Deploy Keys** → **Generate Production Deploy Key** → copy.
-5. Add **GitHub Actions secrets**: `CONVEX_DEPLOY_KEY` (the deploy
-   key) and `CONVEX_URL` (the `.convex.cloud` URL).
+5. Add **environment secrets** to the same `vercel-convex`
+   environment from the Vercel section: `CONVEX_DEPLOY_KEY` (the
+   deploy key) and `CONVEX_URL` (the `.convex.cloud` URL).
 6. Push to `main`. The workflow will run `npx convex deploy` to push
    `convex/schema.ts` + `convex/highscores.ts`, then stamp
    `assets/backend-config.js` with `CONVEX_URL` so the Vercel-served

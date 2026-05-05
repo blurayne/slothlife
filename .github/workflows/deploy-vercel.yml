@@ -1,8 +1,10 @@
 # Optional Vercel + Convex deploy. Runs alongside the GitHub Pages
 # workflow on every push to main, but each step is *gated on the
-# matching repository secret* — if the secret is missing, the step
+# matching environment secret* — if the secret is missing, the step
 # emits a workflow-level warning and skips. So the repo can stay
-# Pages-only by default; flipping it on means setting the secrets.
+# Pages-only by default; flipping it on means populating the
+# `vercel-convex` GitHub Actions environment with the five secrets
+# documented in README › Required environment secrets.
 name: Deploy to Vercel + Convex
 
 on:
@@ -19,6 +21,14 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # The deploy job pulls VERCEL_* and CONVEX_* secrets from the
+    # `vercel-convex` GitHub Actions environment. Create it under
+    # repo Settings → Environments and add the five secrets there
+    # (see README › Required environment secrets). The workflow stays
+    # green even if the environment is empty — every step inside is
+    # gated on its own secret being non-empty and skips with a
+    # warning otherwise.
+    environment: vercel-convex
     steps:
       - uses: actions/checkout@v5
 
