@@ -1649,6 +1649,30 @@ function _isVercelHosted(){
 }
 const useConvexHighscores = _isVercelHosted() && !!window.CONVEX_URL;
 
+// Anonymous per-browser client identifier. Generated once on first
+// submit, persisted in localStorage. Sent with every Convex submit
+// so the server can rate-limit per client (see convex/highscores.ts:
+// RATE_WINDOW_MS / MAX_PER_WINDOW). A determined attacker can clear
+// the key to reset, but it's enough to stop curl-replay loops and
+// the casual "spam the mutation from DevTools" attack.
+function _slothClientId(){
+  const KEY = 'sloth-client-id';
+  let id = null;
+  try { id = localStorage.getItem(KEY); } catch(_){}
+  if(id) return id;
+  if(typeof crypto !== 'undefined' && crypto.randomUUID){
+    id = crypto.randomUUID();
+  } else {
+    // RFC-4122 v4 fallback for browsers without crypto.randomUUID.
+    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    });
+  }
+  try { localStorage.setItem(KEY, id); } catch(_){}
+  return id;
+}
+
 let _convexClientPromise = null;
 async function _getConvexClient(){
   if(_convexClientPromise) return _convexClientPromise;
@@ -1718,7 +1742,11 @@ function insertHighscore(name, s){
     (async () => {
       try {
         const client = await _getConvexClient();
-        await client.mutation('highscores:submit', { name: sanitized, score: s });
+        await client.mutation('highscores:submit', {
+          name:     sanitized,
+          score:    s,
+          clientId: _slothClientId(),
+        });
         await _refreshHighscoresFromConvex();
       } catch(e){ console.warn('Convex highscores submit failed:', e); }
     })();

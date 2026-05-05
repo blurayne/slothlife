@@ -7,7 +7,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 ## Open
 
 - [x] Anti-tampering #1: server-side plausibility cap on highscore submit — [plan](.claude/plans/highscore-anti-tampering.md)
-- [ ] Anti-tampering #2: per-anonymous-clientId rate-limit (3 / 60 s) — [plan](.claude/plans/highscore-anti-tampering.md)
+- [x] Anti-tampering #2: per-anonymous-clientId rate-limit (3 / 60 s) — [plan](.claude/plans/highscore-anti-tampering.md)
 
 ## Shipped this batch
 
