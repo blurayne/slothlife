@@ -1172,6 +1172,51 @@ function applyRain(){
 }
 tRain.addEventListener('click', ()=>{ rainMode = !rainMode; applyRain(); });
 
+// TIME LEFT toggle — swaps the bottom-left HUD between the WIND
+// strength bar (#hud) and the estimated real-world time remaining
+// (#timeleft). Defaults OFF so first-time visitors see the original
+// wind readout. Updated each frame in updateTimeLeftHUD().
+const hudWind  = document.getElementById('hud');
+const hudTleft = document.getElementById('timeleft');
+const tlVal    = document.getElementById('tleft-val');
+const tTleft   = document.getElementById('t-tleft');
+const lTleft   = document.getElementById('l-tleft');
+let timeLeftMode = false;
+function applyTimeLeft(){
+  tTleft.classList.toggle('on', timeLeftMode);
+  lTleft.textContent = timeLeftMode ? 'ON' : 'OFF';
+  hudWind.classList.toggle('hidden',   timeLeftMode);
+  hudTleft.classList.toggle('hidden', !timeLeftMode);
+}
+tTleft.addEventListener('click', () => { timeLeftMode = !timeLeftMode; applyTimeLeft(); });
+
+// Format real-world seconds as a compact "~N min" / "~Nh M" tag. We
+// use the tilde because the estimate can drift if the player tweaks
+// dayPace mid-run; "exactly 23 minutes" would be misleading.
+function _formatTimeLeft(sec){
+  if(!isFinite(sec) || sec <= 0) return '0min';
+  const m = sec / 60;
+  if(m < 1)  return '<1min';
+  if(m < 60) return '~' + Math.round(m) + 'min';
+  const hours = Math.floor(m / 60);
+  const mins  = Math.round(m - hours * 60);
+  return mins > 0 ? `~${hours}h ${mins}m` : `~${hours}h`;
+}
+function updateTimeLeftHUD(){
+  if(!timeLeftMode) return;
+  // Real-world seconds remaining = (months left) × DAY_CYCLE_S / |dayPace|.
+  // Pre-game (gameDaysElapsed = 0) and post-game we just show the
+  // configured maximum so the readout never goes blank.
+  const D = Math.max(0.0001, Math.abs(P.dayPace || 1));
+  let remainingMonths;
+  if(gameState === 'PLAYING' && !gameOver){
+    remainingMonths = Math.max(0, P.endMonths - gameDaysElapsed);
+  } else {
+    remainingMonths = P.endMonths;
+  }
+  tlVal.textContent = _formatTimeLeft(remainingMonths * DAY_CYCLE_S / D);
+}
+
 // SEASONS — always on (the panel toggle is gone). Kept as a const so
 // every existing `if(seasonsMode)` gate around the codebase still
 // short-circuits cleanly without touching dozens of call sites.
@@ -6611,6 +6656,7 @@ function frame(ts){
   drawGameOverHUD();
 
   wfill.style.width=(Wind.str*100).toFixed(0)+'%';
+  updateTimeLeftHUD();
   // PAUSED overlay — drawn last so it sits over all canvas content.
   if(paused){
     ctx.save();
@@ -6653,6 +6699,7 @@ applySunShadow();
 applyWeight();
 applyDayauto();
 applyRain();
+applyTimeLeft();
 // Render the start-screen highscore table on first load too so the
 // "no scores yet" message shows for fresh players (renderHighscoreTable
 // otherwise only ran on between-runs returns to the start screen).

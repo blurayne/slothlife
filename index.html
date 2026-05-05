@@ -101,6 +101,10 @@
 
 
 <div id="hud">WIND<br><div id="wtrack"><div id="wfill"></div></div></div>
+<!-- Replaces #hud when REMAINING TIME is enabled (player setting).
+     JS toggles display: between the two siblings; both share the
+     same bottom-left footprint. -->
+<div id="timeleft" class="hidden">REMAINING<br><span id="tleft-val">~?min</span></div>
 
 <div id="hint">Tap a branch, fruit or leaf to grab!</div>
 
@@ -171,6 +175,8 @@
   <div class="psec">PLAYER</div>
   <div class="ptog-row"><span class="pname">PIXELIZE</span>
     <div class="tog" id="t-pixel"></div><span class="tlbl" id="l-pixel">OFF</span></div>
+  <div class="ptog-row"><span class="pname">TIME LEFT</span>
+    <div class="tog" id="t-tleft"></div><span class="tlbl" id="l-tleft">OFF</span></div>
   <div class="prow"><span class="pname">PIXEL SIZE</span>
     <input type="range" id="s-pixelSize" min="2" max="12" step="1" value="3">
     <span class="pval" id="v-pixelSize">3</span></div>
