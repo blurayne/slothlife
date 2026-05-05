@@ -48,7 +48,7 @@
     <div class="ov-repo">
       <a href="https://github.com/blurayne/slothlife" target="_blank" rel="noopener noreferrer">github.com/blurayne/slothlife</a>
     </div>
-    <div class="ov-version js-version"></div>
+    <div class="ov-version js-version-stack"></div>
   </div>
 </div>
 
@@ -165,7 +165,7 @@
 </button>
 
 <div id="panel" class="hidden locked">
-  <div class="pversion js-version"></div>
+  <div class="pversion js-version-top"></div>
   <!-- RELOAD is a dev-only debugging shortcut (clears the SW cache
        + reloads). Hidden behind dev-mode so a normal player isn't
        tempted to nuke their session by accident. -->
@@ -299,6 +299,11 @@
        (varies between PLAYER and dev modes). -->
   <div class="prow" style="margin-top:18px"><span class="pname"></span>
     <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">⟲ RESTART</button></div>
+
+  <!-- Build metadata (build N · DATE · SHA7) — a player-irrelevant
+       diagnostic, sits at the absolute bottom of the panel so a
+       bug-reporter can read it off without obscuring anything. -->
+  <div class="pversion-foot js-version-bottom"></div>
 </div>
 
 <div id="scanlines"></div>

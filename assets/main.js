@@ -234,33 +234,61 @@ document.addEventListener('click', (e)=>{
 });
 applyPanelState();
 
-// Stamp every `.js-version` element with the build info baked into
-// version.js. Components are joined with " · " and conditionally
-// included so noisy / placeholder values don't show:
-//   * APP_ENV     → only if set (e.g. 'github-pages', 'vercel-convex').
-//   * APP_VERSION → only if it parses as a semantic version (e.g.
-//                   'v1.2.3', '1.2.3-rc.1'); 'main' / 'dev' / a
-//                   feature-branch ref is omitted.
-//   * build N, ISO date, short SHA → rendered when present (the
-//                   defaults in version.js are skipped).
+// Stamp build-info elements with the values baked into version.js.
+// Components are conditionally included so noisy / placeholder
+// values never render:
+//   * APP_ENV     → only if set ('github-pages', 'vercel-convex', …).
+//   * APP_VERSION → only if it parses as a SemVer 2.0 string. A
+//                   branch ref like 'main' / 'dev' is omitted.
+//   * build N, ISO date, short SHA → rendered when present.
+//
+// Three slots, each fed by the same parts but joined differently:
+//   .js-version-top     — settings panel header. Identity only:
+//                         env [+ version]. The volatile build-time
+//                         metadata moves out of the player's eye.
+//   .js-version-bottom  — settings panel footer. Build / date /
+//                         SHA — the bits a developer actually needs
+//                         when filing a bug.
+//   .js-version-stack   — start-screen footer. All five parts, with
+//                         a line break after `build N` so the
+//                         identity sits on its own line.
 {
   const env  = String(window.APP_ENV     || '').trim();
   const ver  = String(window.APP_VERSION || '').trim();
   const bld  = String(window.APP_BUILD   || '').trim();
   const date = String(window.APP_DATE    || '').trim();
   const sha  = String(window.APP_SHA     || '').trim();
-  // SemVer 2.0 — optional leading "v", required N.N.N, optional
-  // pre-release and build-meta tails.
   const SEMVER_RE = /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-  const parts = [];
-  if(env)                              parts.push(env);
-  if(ver && SEMVER_RE.test(ver))       parts.push(ver.startsWith('v') ? ver : 'v' + ver);
-  if(bld && bld !== '0')               parts.push('build ' + bld);
-  if(date && date !== 'local')         parts.push(date);
-  if(sha && sha !== 'unknown')         parts.push(sha.slice(0, 7));
-  const verText = parts.join(' · ');
-  document.querySelectorAll('.js-version').forEach(el => {
-    el.textContent = verText;
+  const partEnv  = env || '';
+  const partVer  = (ver && SEMVER_RE.test(ver))
+    ? (ver.startsWith('v') ? ver : 'v' + ver) : '';
+  const partBld  = (bld && bld !== '0') ? ('build ' + bld) : '';
+  const partDate = (date && date !== 'local') ? date : '';
+  const partSha  = (sha && sha !== 'unknown') ? sha.slice(0, 7) : '';
+  const join = (...a) => a.filter(Boolean).join(' · ');
+
+  const headLine = join(partEnv, partVer);              // top of panel
+  const tailLine = join(partBld, partDate, partSha);    // bottom of panel
+  const stackTop = join(partEnv, partVer, partBld);     // start screen, line 1
+  const stackBot = join(partDate, partSha);             // start screen, line 2
+
+  document.querySelectorAll('.js-version-top').forEach((el) => {
+    el.textContent = headLine;
+  });
+  document.querySelectorAll('.js-version-bottom').forEach((el) => {
+    el.textContent = tailLine;
+  });
+  document.querySelectorAll('.js-version-stack').forEach((el) => {
+    el.textContent = '';
+    if(stackTop) el.appendChild(document.createTextNode(stackTop));
+    if(stackTop && stackBot) el.appendChild(document.createElement('br'));
+    if(stackBot) el.appendChild(document.createTextNode(stackBot));
+  });
+  // Back-compat for any leftover `.js-version` element — render the
+  // full single-line stamp (matches the previous behaviour).
+  const fullText = join(partEnv, partVer, partBld, partDate, partSha);
+  document.querySelectorAll('.js-version').forEach((el) => {
+    el.textContent = fullText;
   });
 }
 

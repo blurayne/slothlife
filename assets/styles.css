@@ -142,6 +142,21 @@
   .pversion:empty{
     margin:0; padding:0; border:0;
   }
+  /* Mirror of .pversion for the panel footer (build / date / SHA).
+     Top-bordered + dim instead of bottom-bordered so it visually
+     anchors the bottom of the scroll without stealing focus. */
+  .pversion-foot{
+    font-size:9px;
+    color:rgba(255,255,255,.30);
+    margin:14px 0 0;
+    padding-top:9px;
+    border-top:1px solid rgba(255,255,255,.06);
+    letter-spacing:.05em;
+    word-break:break-all;
+  }
+  .pversion-foot:empty{
+    margin:0; padding:0; border:0;
+  }
   .psec{
     font-size:9px;letter-spacing:.20em;
     color:rgba(180,210,255,.45);
