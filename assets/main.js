@@ -266,11 +266,31 @@ applyPanelState();
   const date = String(window.APP_DATE    || '').trim();
   const sha  = String(window.APP_SHA     || '').trim();
   const SEMVER_RE = /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+  // Render the deploy timestamp in the viewer's local timezone with
+  // an explicit "UTC ±HH:MM" offset, e.g.
+  //   "2026-05-05T19:00:00Z" → "2026-05-05 20:00 UTC +01:00"
+  // Falls back to the raw ISO string if the date isn't parseable.
+  const formatLocalDate = (iso) => {
+    const d = new Date(iso);
+    if(isNaN(d.getTime())) return iso;
+    const pad = (n) => String(n).padStart(2, '0');
+    const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-` +
+                  `${pad(d.getDate())} ${pad(d.getHours())}:` +
+                  `${pad(d.getMinutes())}`;
+    const offMin = -d.getTimezoneOffset();   // east of UTC = positive
+    const sign   = offMin >= 0 ? '+' : '-';
+    const abs    = Math.abs(offMin);
+    const offH   = pad(Math.floor(abs / 60));
+    const offM   = pad(abs % 60);
+    return `${local} UTC ${sign}${offH}:${offM}`;
+  };
+
   const partEnv  = env || '';
   const partVer  = (ver && SEMVER_RE.test(ver))
     ? (ver.startsWith('v') ? ver : 'v' + ver) : '';
   const partBld  = (bld && bld !== '0') ? ('build ' + bld) : '';
-  const partDate = (date && date !== 'local') ? date : '';
+  const partDate = (date && date !== 'local') ? formatLocalDate(date) : '';
   const partSha  = (sha && sha !== 'unknown') ? sha.slice(0, 7) : '';
   const join = (...a) => a.filter(Boolean).join(' · ');
 
