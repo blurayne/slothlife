@@ -6681,6 +6681,12 @@ function frame(ts){
         const halfAng = (PI * 2 / rayCount) * 0.30;
 
         ctx.save();
+        // Re-apply the camera transform so the rays stay locked to
+        // the sun disc when the player swipes the scene. Without
+        // this, sun.x/sun.y reads as pure screen space and the rays
+        // drift away from the disc (which was drawn inside the
+        // camera transform up in drawBg → drawSunMoon).
+        applyCameraTransform();
         ctx.translate(sun.x, sun.y);
         ctx.rotate(rot);
         // Per-ray gradient: bright at the sun edge, soft at the tip.
