@@ -55,6 +55,29 @@
     border-color:rgba(255,255,255,.22);
     background:rgba(12,28,50,.90);
   }
+  /* Long-press feedback: a thin amber ring fills as the player
+     holds the gear; on release JS removes .holding. The --hold
+     CSS var (0..1) is updated each rAF tick. */
+  #ic-settings{ position:fixed; }
+  #ic-settings::after{
+    content:'';
+    position:absolute; inset:-3px;
+    border-radius:8px;
+    pointer-events:none;
+    background:conic-gradient(
+      rgba(255,210,80,.85) calc(var(--hold,0) * 360deg),
+      transparent 0
+    );
+    -webkit-mask:radial-gradient(circle, transparent 60%, #000 62%);
+            mask:radial-gradient(circle, transparent 60%, #000 62%);
+    opacity:0;
+    transition:opacity .12s;
+  }
+  #ic-settings.holding::after{ opacity:1; }
+  #ic-settings.holding{
+    color:rgba(255,255,255,.95);
+    border-color:rgba(255,210,80,.35);
+  }
   /* While the settings panel is open, fade out ALL bottom-bar icons
      (gear included) so the panel feels modal. Tapping anywhere outside
      the panel closes it (handled by the document click handler), so
@@ -88,6 +111,10 @@
   /* panel scrollbar */
   #panel::-webkit-scrollbar{width:4px}
   #panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:2px}
+
+  /* Player vs developer mode — when #panel.locked, hide every
+     .dev-only block. Toggled by a 2.5s long-press on the gear. */
+  #panel.locked .dev-only{ display:none; }
 
   .ptitle{
     font-size:10px;letter-spacing:.20em;
@@ -248,6 +275,35 @@
     font-size:12px;line-height:1.45;
     color:#FFE678;letter-spacing:.04em;
   }
+  /* Subtler styling for the dev-mode hint — same shape, muted
+     palette so it reads as a secondary tip rather than a primary
+     gameplay TIP. */
+  .ov-tip-dev{
+    margin-top:6px;
+    background:rgba(160,200,255,0.05);
+    border-left-color:rgba(160,200,255,.55);
+    color:rgba(200,220,245,.78);
+    font-size:11px;
+  }
+
+  /* Toast — short message in the centre-top of the screen, fades
+     out. Used to announce dev-mode toggles. */
+  #devmode-toast{
+    position:fixed;top:14vh;left:50%;
+    transform:translateX(-50%);
+    background:rgba(6,12,20,.92);
+    color:#FFE678;
+    border:1px solid rgba(255,210,80,.35);
+    border-radius:6px;
+    padding:8px 14px;
+    font:bold 12px 'Courier New',monospace;
+    letter-spacing:.18em;
+    z-index:50;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .25s;
+  }
+  #devmode-toast.show{ opacity:1; }
 
   .ov-btn{
     display:block;width:100%;

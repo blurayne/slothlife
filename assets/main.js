@@ -98,17 +98,121 @@ sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
 
 // ════════════════════════════════════════════════════════
 //  PANEL TOGGLE  (gear icon, bottom-right; panel slides in/out)
+//  ─ Tap the gear to open/close the panel.
+//  ─ Tap-and-hold the gear for ~2.5s to toggle developer mode.
+//    Player mode (.locked) hides the .dev-only sections so a
+//    normal player only sees PIXELIZE / BACKGROUND / TRACK / volumes.
+//    The flag persists in localStorage as 'sloth-devmode'.
 // ════════════════════════════════════════════════════════
 const panel    = document.getElementById('panel');
 const icSettings = document.getElementById('ic-settings');
 let panelOpen = false;   // start collapsed
+
+const DEVMODE_KEY = 'sloth-devmode';
+let devMode = false;
+try { devMode = localStorage.getItem(DEVMODE_KEY) === '1'; } catch(_){}
+function applyDevMode(){
+  panel.classList.toggle('locked', !devMode);
+}
+applyDevMode();   // before first paint
+
 function applyPanelState(){
   panel.classList.toggle('hidden', !panelOpen);
   icSettings.classList.toggle('active', panelOpen);
   document.body.classList.toggle('panel-open', panelOpen);
 }
-icSettings.addEventListener('click', (e)=>{
+
+// Long-press detection: pointerdown starts a rAF loop that fills the
+// `--hold` CSS var (0..1) on the gear. After DEVMODE_HOLD_MS the
+// dev-mode flag flips and `holdFired` is set so the trailing
+// pointerup doesn't also toggle the panel. Movement > 12 px or
+// pointerup before threshold cancels.
+const DEVMODE_HOLD_MS = 2500;
+const HOLD_CANCEL_PX  = 12;
+let _holdRaf = 0, _holdStart = 0, _holdPointerId = null;
+let _holdStartXY = null, _holdFired = false;
+function _setHoldVar(t){
+  icSettings.style.setProperty('--hold', String(Math.min(1, t)));
+}
+function _holdTick(){
+  if(_holdStart === 0) return;
+  const t = (performance.now() - _holdStart) / DEVMODE_HOLD_MS;
+  _setHoldVar(t);
+  if(t >= 1){
+    _holdFired = true;
+    _holdEnd();
+    toggleDevMode();
+    return;
+  }
+  _holdRaf = requestAnimationFrame(_holdTick);
+}
+function _holdBegin(e){
+  _holdFired = false;
+  _holdStart = performance.now();
+  _holdPointerId = e.pointerId;
+  _holdStartXY = { x: e.clientX, y: e.clientY };
+  icSettings.classList.add('holding');
+  _setHoldVar(0);
+  cancelAnimationFrame(_holdRaf);
+  _holdRaf = requestAnimationFrame(_holdTick);
+}
+function _holdEnd(){
+  cancelAnimationFrame(_holdRaf);
+  _holdRaf = 0;
+  _holdStart = 0;
+  _holdPointerId = null;
+  _holdStartXY = null;
+  icSettings.classList.remove('holding');
+  _setHoldVar(0);
+}
+
+function showDevModeToast(text){
+  let el = document.getElementById('devmode-toast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'devmode-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+function toggleDevMode(){
+  devMode = !devMode;
+  try {
+    if(devMode) localStorage.setItem(DEVMODE_KEY, '1');
+    else        localStorage.removeItem(DEVMODE_KEY);
+  } catch(_){}
+  applyDevMode();
+  // Make sure the panel is open so the player sees what changed.
+  panelOpen = true;
+  applyPanelState();
+  showDevModeToast(devMode ? 'DEVELOPER MODE ON' : 'DEVELOPER MODE OFF');
+}
+
+icSettings.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  if(e.button !== undefined && e.button !== 0) return;
+  _holdBegin(e);
+});
+icSettings.addEventListener('pointermove', (e) => {
+  if(_holdPointerId !== e.pointerId || !_holdStartXY) return;
+  const dx = e.clientX - _holdStartXY.x;
+  const dy = e.clientY - _holdStartXY.y;
+  if(dx*dx + dy*dy > HOLD_CANCEL_PX * HOLD_CANCEL_PX) _holdEnd();
+});
+icSettings.addEventListener('pointerup',     () => _holdEnd());
+icSettings.addEventListener('pointercancel', () => _holdEnd());
+icSettings.addEventListener('pointerleave',  () => _holdEnd());
+
+icSettings.addEventListener('click', (e) => {
   e.stopPropagation();   // don't let the document handler immediately close it
+  if(_holdFired){        // long-press already toggled devMode + panel
+    _holdFired = false;
+    return;
+  }
   panelOpen = !panelOpen;
   applyPanelState();
 });
