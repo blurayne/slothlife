@@ -135,7 +135,7 @@ function applyPanelState(){
 // dev-mode flag flips and `holdFired` is set so the trailing
 // pointerup doesn't also toggle the panel. Movement > 12 px or
 // pointerup before threshold cancels.
-const DEVMODE_HOLD_MS = 2500;
+const DEVMODE_HOLD_MS = 2000;
 const HOLD_CANCEL_PX  = 12;
 let _holdRaf = 0, _holdStart = 0, _holdPointerId = null;
 let _holdStartXY = null, _holdFired = false;

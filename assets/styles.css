@@ -70,25 +70,11 @@
     border-color:rgba(255,255,255,.22);
     background:rgba(12,28,50,.90);
   }
-  /* Long-press feedback: a thin amber ring fills as the player
-     holds the gear; on release JS removes .holding. The --hold
-     CSS var (0..1) is updated each rAF tick. */
-  #ic-settings{ position:fixed; }
-  #ic-settings::after{
-    content:'';
-    position:absolute; inset:-3px;
-    border-radius:8px;
-    pointer-events:none;
-    background:conic-gradient(
-      rgba(255,210,80,.85) calc(var(--hold,0) * 360deg),
-      transparent 0
-    );
-    -webkit-mask:radial-gradient(circle, transparent 60%, #000 62%);
-            mask:radial-gradient(circle, transparent 60%, #000 62%);
-    opacity:0;
-    transition:opacity .12s;
-  }
-  #ic-settings.holding::after{ opacity:1; }
+  /* Long-press feedback: only the button background brightens; the
+     conic-gradient progress ring was removed because the user
+     preferred a quieter, no-spinner interaction. JS still updates
+     the --hold CSS var while pressed in case any future styling
+     wants to read it. */
   #ic-settings.holding{
     color:rgba(255,255,255,.95);
     border-color:rgba(255,210,80,.35);
