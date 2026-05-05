@@ -111,19 +111,47 @@ no frontend reads them. Setting all five lights up the full path.
 
 ### One-time Vercel setup
 
-1. `npm install -g vercel` (or use `npx vercel` ad-hoc).
-2. From the repo root: `vercel link`. Pick the team/project; it writes
-   `.vercel/project.json` (gitignored). Copy `orgId` and `projectId`.
-3. <https://vercel.com/account/tokens> → **Create Token** → copy.
-4. In the GitHub repo: **Settings → Secrets and variables → Actions**
-   → **New repository secret** for each of `VERCEL_TOKEN`,
-   `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
-5. Push to `main` (or run **Deploy to Vercel + Convex** from the
-   Actions tab) — first deploy creates the Vercel project's URL
-   (something like `https://slothlife.vercel.app`). The
-   `vercel.json` in the repo root sets `Cache-Control: no-cache` for
-   the HTML and `immutable, max-age=1y` for `/assets/*` so the
-   cache-bust query strings cache cleanly.
+1. **Import the project on vercel.com** (Add New… → Project → pick
+   the GitHub repo). On the import screen use these settings — the
+   site is plain static HTML with no build step:
+
+   | field                  | value                                  |
+   |------------------------|----------------------------------------|
+   | **Framework Preset**   | `Other` (sometimes labelled `None` / `Static`) |
+   | **Root Directory**     | leave default (`./`)                   |
+   | **Build Command**      | leave empty / "Override" off           |
+   | **Output Directory**   | leave empty / "Override" off (Vercel serves from the root) |
+   | **Install Command**    | leave default (Vercel runs `npm install`; the deps are dev-only for Convex tooling) |
+
+   Headers + caching come from `vercel.json` — nothing to configure
+   in the dashboard for those.
+
+   After import, on the project's **Settings → Git** page, decide
+   whether to leave Vercel's own auto-deploy on or disable it. If
+   you keep both Vercel auto-deploy AND the GitHub Actions workflow
+   below, you'll get two production deploys per push (harmless, but
+   noisy). The Actions workflow is the one you want feeding
+   production because it also runs `convex deploy` and stamps
+   `version.js` / `backend-config.js` with the SHA + Convex URL —
+   Vercel's built-in deploy can't do those steps.
+
+2. **Set up the GitHub Actions credentials** so the workflow can
+   push to Vercel:
+   - `npm install -g vercel` (or use `npx vercel` ad-hoc).
+   - From the repo root: `vercel link`. Pick the team/project you
+     just imported; it writes `.vercel/project.json` (gitignored).
+     Copy `orgId` and `projectId`.
+   - <https://vercel.com/account/tokens> → **Create Token** → copy.
+   - In the GitHub repo: **Settings → Secrets and variables →
+     Actions** → **New repository secret** for each of
+     `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+
+3. Push to `main` (or run **Deploy to Vercel + Convex** from the
+   Actions tab). The first deploy publishes the Vercel project's
+   URL (e.g. `https://slothlife.vercel.app`). The `vercel.json` in
+   the repo root sets `Cache-Control: no-cache` for the HTML and
+   `immutable, max-age=1y` for `/assets/*` so the cache-bust query
+   strings cache cleanly.
 
 ### One-time Convex setup
 
