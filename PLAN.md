@@ -6,9 +6,15 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Open
 
-- [ ] Unicode-safe highscore names (faulbär → FAULBÄR) — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
-- [ ] Settings panel: gate dev controls behind a 2.5s long-press on the gear — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
-- [ ] Highscores: top-100 dialog with relative timestamps; start/end show top 10 — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
+_(none)_
+
+## Shipped this batch
+
+- [x] Unicode-safe highscore names (faulbär → FAULBÄR) — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
+- [x] Settings panel: gate dev controls behind a 2.5s long-press on the gear — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
+- [x] Highscores: top-100 dialog with relative timestamps; start/end show top 10 — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
+- [x] **Apple reward bumped from +10 to +15 points**
+- [x] **Version stamp: env-prefixed, semver-only, no JSON link**
 
 ## Shipped
 
