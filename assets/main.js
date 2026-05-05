@@ -2340,7 +2340,7 @@ class Sloth{
       if(f && f.alive !== false){
         // Convert the apple itself into a popup: mark it consumed and
         // spawn the floating "+25" at its current world position.
-        spawnScorePopup(f.x, f.y, 10, '#FFD230');
+        spawnScorePopup(f.x, f.y, 15, '#FFD230');
         f.alive = false;
         hunger = Math.min(1, hunger + HUNGER_APPLE_GAIN);
         Audio.playEatApple();

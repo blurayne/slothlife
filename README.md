@@ -14,7 +14,7 @@ hours, and try not to starve or fall.
 ## How to play
 
 - **Tap a branch** to swing the sloth toward it.
-- **Tap an apple** for **+10 pts**, **tap a leaf** for **+1 pt**.
+- **Tap an apple** for **+15 pts**, **tap a leaf** for **+1 pt**.
 - **Survive a full in-game month** for **+50 pts**.
 - **Swipe the grass** to pan the scene left or right.
 - The hunger bar drains constantly — keep eating. Sleeping slows
