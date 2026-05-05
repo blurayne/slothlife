@@ -134,8 +134,8 @@
   #panel:not(.locked) .player-only{ display:none; }
 
   .ptitle{
-    font-size:10px;letter-spacing:.20em;
-    color:rgba(255,255,255,.40);
+    font-size:209%;letter-spacing:.20em;
+    color:#fff;
     margin-bottom:10px;padding-bottom:7px;
     border-bottom:1px solid rgba(255,255,255,.06);
   }
