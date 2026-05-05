@@ -6,7 +6,9 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Open
 
-_(none)_
+- [ ] Unicode-safe highscore names (faulbär → FAULBÄR) — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
+- [ ] Settings panel: gate dev controls behind a 2.5s long-press on the gear — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
+- [ ] Highscores: top-100 dialog with relative timestamps; start/end show top 10 — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
 
 ## Shipped
 

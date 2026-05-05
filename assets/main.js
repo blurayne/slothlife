@@ -1521,7 +1521,13 @@ function qualifiesForLeaderboard(s){
   return s > highscores[highscores.length - 1].score;
 }
 function insertHighscore(name, s){
-  const sanitized = (name || '???').slice(0, 8).toUpperCase();
+  // Unicode-safe sanitisation: strip control chars only (so "ä",
+  // "ö", emoji, … survive), slice by code points so a multi-unit
+  // char isn't split, and toLocaleUpperCase() so "ä" → "Ä". Matches
+  // the server-side rule in convex/highscores.ts.
+  const cleaned = (name || '???').replace(/[\x00-\x1f\x7f]/g, '').trim();
+  const sanitized =
+    ([...cleaned].slice(0, 8).join('') || '???').toLocaleUpperCase();
   // Always put the new entry into the in-memory cache first so the UI
   // reflects it immediately; persistence then routes by environment.
   highscores.push({ name: sanitized, score: s, date: Date.now() });
@@ -5260,7 +5266,11 @@ document.getElementById('ov-end-btn').addEventListener('click', () => {
 });
 document.getElementById('ov-name-btn').addEventListener('click', () => {
   const inp = document.getElementById('ov-name-input');
-  const name = (inp.value || '').trim().toUpperCase().slice(0,8) || 'ANON';
+  // Code-point-aware slice + locale-uppercase so non-ASCII names
+  // ("faulbär" → "FAULBÄR") survive intact and emoji aren't split.
+  const cleaned = (inp.value || '').replace(/[\x00-\x1f\x7f]/g, '').trim();
+  const name =
+    ([...cleaned].slice(0, 8).join('') || 'ANON').toLocaleUpperCase();
   insertHighscore(name, score);
   lastInsertedName = name;
   showEndScreen();
