@@ -12,17 +12,21 @@
   #wtrack{width:80px;height:2px;background:rgba(255,255,255,.10);margin-top:2px}
   #wfill{height:100%;background:rgba(200,232,255,.55);width:0}
   /* Time-left HUD — same slot as #hud, swapped when the TIME LEFT
-     player toggle is on. .hidden class hides whichever isn't active. */
+     player toggle is on. .hidden class hides whichever isn't active.
+     Sized to match the canvas-rendered SCORE in the top HUD
+     (drawScoreHUD: bold 16 × HUD_SCALE 1.20 ≈ 19 px Courier New)
+     and tinted the same #FFE678 — the text-shadow approximates the
+     black stroke applied on canvas so the readout stays legible
+     over the bright meadow at midday. */
   #timeleft{
     position:fixed;bottom:18px;left:22px;
-    font:10px 'Courier New',monospace;
-    color:rgba(255,255,255,.30);letter-spacing:.12em;
-    pointer-events:none;line-height:2;
-    min-width:80px;
-  }
-  #timeleft #tleft-val{
-    color:rgba(255,230,170,.70);
-    font-weight:bold;
+    font:bold 19px 'Courier New',monospace;
+    color:#FFE678;letter-spacing:.04em;
+    pointer-events:none;line-height:1;
+    text-shadow:
+      0 0 6px rgba(0,0,0,.85),
+      1px 1px 0 rgba(0,0,0,.65),
+      -1px -1px 0 rgba(0,0,0,.65);
   }
   #hud.hidden, #timeleft.hidden{ display:none; }
 
