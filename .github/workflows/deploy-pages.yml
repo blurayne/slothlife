@@ -47,6 +47,7 @@ jobs:
           # what the deployed file will contain (verifiable from the
           # Actions tab if anyone wonders whether the stamp ran).
           {
+            echo "window.APP_ENV     = 'github-pages';"
             echo "window.APP_VERSION = '${{ github.ref_name }}';"
             echo "window.APP_BUILD   = '${{ github.run_number }}';"
             echo "window.APP_DATE    = '$(date -u +%Y-%m-%dT%H:%M:%SZ)';"

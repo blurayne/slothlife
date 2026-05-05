@@ -227,14 +227,30 @@ document.addEventListener('click', (e)=>{
 applyPanelState();
 
 // Stamp every `.js-version` element with the build info baked into
-// version.js (defaults to dev/local/unknown; the Pages workflow rewrites
-// version.js with real values before deploy). Currently used by the
-// settings-panel header and the bottom of the start-screen overlay.
+// version.js. Components are joined with " · " and conditionally
+// included so noisy / placeholder values don't show:
+//   * APP_ENV     → only if set (e.g. 'github-pages', 'vercel-convex').
+//   * APP_VERSION → only if it parses as a semantic version (e.g.
+//                   'v1.2.3', '1.2.3-rc.1'); 'main' / 'dev' / a
+//                   feature-branch ref is omitted.
+//   * build N, ISO date, short SHA → rendered when present (the
+//                   defaults in version.js are skipped).
 {
-  const sha = String(window.APP_SHA || 'unknown').slice(0, 7);
-  const verText =
-    `v${window.APP_VERSION || 'dev'} · build ${window.APP_BUILD || 0} · ` +
-    `${window.APP_DATE || 'local'} · ${sha}`;
+  const env  = String(window.APP_ENV     || '').trim();
+  const ver  = String(window.APP_VERSION || '').trim();
+  const bld  = String(window.APP_BUILD   || '').trim();
+  const date = String(window.APP_DATE    || '').trim();
+  const sha  = String(window.APP_SHA     || '').trim();
+  // SemVer 2.0 — optional leading "v", required N.N.N, optional
+  // pre-release and build-meta tails.
+  const SEMVER_RE = /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+  const parts = [];
+  if(env)                              parts.push(env);
+  if(ver && SEMVER_RE.test(ver))       parts.push(ver.startsWith('v') ? ver : 'v' + ver);
+  if(bld && bld !== '0')               parts.push('build ' + bld);
+  if(date && date !== 'local')         parts.push(date);
+  if(sha && sha !== 'unknown')         parts.push(sha.slice(0, 7));
+  const verText = parts.join(' · ');
   document.querySelectorAll('.js-version').forEach(el => {
     el.textContent = verText;
   });
