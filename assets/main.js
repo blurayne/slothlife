@@ -24,9 +24,9 @@ setTimeout(()=>hintEl.classList.add('fade'), 300);
 //  LIVE PARAMETERS
 // ════════════════════════════════════════════════════════
 const P = {
-  windForce:   1.95,
+  windForce:   1.5,
   windSpeed:   1.0,
-  turbulence:  0.5,
+  turbulence:  0.85,
   stiffness:   1.9,
   damping:     1.6,
   swing:       0.70,
@@ -2793,9 +2793,13 @@ class Sloth{
       for(const f of fruits){
         if(f.fallen) continue;
         const sameBranch = f.branch === branch;
+        // Knock-off chance halved from the previous tuning so a
+        // swinging / grabbing sloth doesn't strip the orchard on
+        // the way past — same-branch grabs hover near the cap,
+        // neighbour-branch shake stays a rare nudge.
         const knockP = sameBranch
-          ? Math.min(0.92, 0.55 + impactMag * 0.25)
-          : Math.min(0.25, impactMag * 0.07);
+          ? Math.min(0.46, 0.275 + impactMag * 0.125)
+          : Math.min(0.125, impactMag * 0.035);
         if(Math.random() < knockP) f.detach(impactMag * 0.5);
       }
     }
