@@ -11,6 +11,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped this batch
 
+- [x] **Sun rays draw before clouds** so a passing cloud occludes the rays as well as the disc — [plan](.claude/plans/forced-prefs-timestamp-and-rays-behind-clouds.md)
 - [x] **`FORCED_PREFS_TIMESTAMP`: bump to force-reset stale player-prefs blobs** — [plan](.claude/plans/forced-prefs-timestamp-and-rays-behind-clouds.md)
 - [x] **HTML title → "A Sloth's Life" + sloth-face SVG favicon**
 - [x] **Sun shade fades in/out over 0.7s on toggle/rain transitions** (natural sunset still drives strength via sun.opacity)

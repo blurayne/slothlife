@@ -4769,6 +4769,50 @@ function drawSunMoon(){
     ctx.beginPath(); ctx.arc(moon.x-2, moon.y+6, 2.0, 0, PI*2); ctx.fill();
   }
 }
+// Summer sun-burst rays. Called from drawBg() right after the sun
+// disc + before clouds, so a passing cloud occludes both the disc
+// and its rays in a single silhouette. The inner section of each
+// ray gradient fades to zero within the sun radius (sR), so the
+// disc still reads cleanly even though the rays are drawn on top
+// of it. World-locked via applyCameraTransform so swiping the
+// camera doesn't desync rays from the disc.
+function drawSummerSunRays(){
+  if(!seasonsMode) return;
+  const sInfo = getSeasonInfo(seasonTime);
+  if(sInfo.summerTint <= 0) return;
+  const sun = getSunPos(dayTime);
+  if(sun.opacity <= 0) return;
+
+  const rayAlpha = sInfo.summerTint * sun.opacity * 0.55;
+  const rayCount = 12;
+  const sR       = 32;            // matches drawSunMoon
+  const rayLen   = sR * 6;
+  const rot      = (performance.now() * 0.00025) % (PI * 2);
+  const halfAng  = (PI * 2 / rayCount) * 0.30;
+  const sunFrac  = sR / rayLen;
+
+  ctx.save();
+  applyCameraTransform();
+  ctx.translate(sun.x, sun.y);
+  ctx.rotate(rot);
+  for(let i = 0; i < rayCount; i++){
+    const a = (i / rayCount) * PI * 2;
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rayLen);
+    grad.addColorStop(0,                              'rgba(255, 253, 225, 0)');
+    grad.addColorStop(sunFrac * 0.55,                 'rgba(255, 240, 170, 0)');
+    grad.addColorStop(sunFrac,                        `rgba(255, 240, 170, ${rayAlpha})`);
+    grad.addColorStop(sunFrac + (1 - sunFrac) * 0.45, `rgba(255, 225, 130, ${rayAlpha * 0.45})`);
+    grad.addColorStop(1,                              'rgba(255, 220, 110, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a - halfAng) * rayLen, Math.sin(a - halfAng) * rayLen);
+    ctx.lineTo(Math.cos(a + halfAng) * rayLen, Math.sin(a + halfAng) * rayLen);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
 
 // ════════════════════════════════════════════════════════
 //  RAIN
@@ -6183,6 +6227,11 @@ function drawBg(){
 
   // Sun & Moon arcs across the sky
   drawSunMoon();
+  // Summer sun-burst rays — drawn here (between the sun disc and
+  // the cloud pass below) so a cloud crossing the sun occludes
+  // both the disc and its rays in a single silhouette. Gated to
+  // summer + sun-above-horizon inside the function.
+  drawSummerSunRays();
 
   // Rain darkening overlay on the sky (no clouds yet — those come last)
   if(rainIntensity > 0.02){
@@ -6708,58 +6757,10 @@ function frame(ts){
       ctx.fillStyle = `rgba(255, 150, 60, ${blendStrength})`;
       ctx.fillRect(0, 0, W, H);
       ctx.restore();
-      const sun = getSunPos(dayTime);
-      if(sun.opacity > 0){
-        const rayAlpha = sInfo.summerTint * sun.opacity * 0.55;
-        // Fewer rays so each one reads more clearly and the canopy
-        // doesn't get washed out.
-        const rayCount = 12;
-        // Sun disc radius (matches drawSunMoon's sR=32). Rays fade out
-        // at ~6× this — long enough to read as a sun-burst.
-        const sR = 32;
-        const rayLen = sR * 6;
-        // Visible rotation: full revolution every ~25 seconds so the
-        // shimmer is noticeable without looking spinny.
-        const rot = (performance.now() * 0.00025) % (PI * 2);
-        // Half-angle of each bright ray wedge (radians).
-        const halfAng = (PI * 2 / rayCount) * 0.30;
-
-        ctx.save();
-        // Re-apply the camera transform so the rays stay locked to
-        // the sun disc when the player swipes the scene. Without
-        // this, sun.x/sun.y reads as pure screen space and the rays
-        // drift away from the disc (which was drawn inside the
-        // camera transform up in drawBg → drawSunMoon).
-        applyCameraTransform();
-        ctx.translate(sun.x, sun.y);
-        ctx.rotate(rot);
-        // Per-ray gradient: the inner section fades to zero within
-        // the sun's own radius (sR) using a circular falloff that
-        // mirrors the disc, so the sun sprite reads cleanly on top
-        // of the wedges instead of being overpainted at its centre.
-        // Brightness ramps in just past the disc edge and tapers
-        // out to transparent at rayLen — the wedge length itself
-        // is unchanged.
-        const sunFrac = sR / rayLen;          // sun edge as fraction of rayLen
-        for(let i = 0; i < rayCount; i++){
-          const a = (i / rayCount) * PI * 2;
-          const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rayLen);
-          grad.addColorStop(0,                 'rgba(255, 253, 225, 0)');
-          grad.addColorStop(sunFrac * 0.55,    'rgba(255, 240, 170, 0)');
-          grad.addColorStop(sunFrac,           `rgba(255, 240, 170, ${rayAlpha})`);
-          grad.addColorStop(sunFrac + (1 - sunFrac) * 0.45,
-                                               `rgba(255, 225, 130, ${rayAlpha * 0.45})`);
-          grad.addColorStop(1,                 'rgba(255, 220, 110, 0)');
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          ctx.lineTo(Math.cos(a - halfAng) * rayLen, Math.sin(a - halfAng) * rayLen);
-          ctx.lineTo(Math.cos(a + halfAng) * rayLen, Math.sin(a + halfAng) * rayLen);
-          ctx.closePath();
-          ctx.fill();
-        }
-        ctx.restore();
-      }
+      // Sun rays themselves are drawn earlier, in drawBg() between
+      // the sun disc and the cloud pass, so a passing cloud can
+      // occlude the rays. Only the warm-orange foreground wash
+      // belongs here.
     }
     if(sInfo.autumnTint > 0 && sInfo.winterness < 1){
       // Warm yellow/orange wash — strongest at autumn peak (day ~4.5).
