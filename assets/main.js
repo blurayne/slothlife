@@ -51,11 +51,11 @@ const P = {
   fxVol:       0.57,
   // Master multiplier on the sun-shade effect — per-branch tint,
   // trunk gradient, and full-screen soft-light pass all scale by
-  // P.shadeStrength. 1.0 = original mild look; 2.3 (default) is
-  // the player-facing punch. Exposed via the dev-mode SHADE
-  // STRENGTH slider; clamping happens at the call sites so values
-  // up to 6 remain visually sane without blowing colours.
-  shadeStrength: 2.3,
+  // P.shadeStrength. 1.0 = original mild look; 1.4 (default) gives
+  // a noticeable rake without crushing colours. Exposed via the
+  // dev-mode SHADE STRENGTH slider; clamping happens at the call
+  // sites so values up to 6 remain visually sane.
+  shadeStrength: 1.4,
 };
 
 // ════════════════════════════════════════════════════════
@@ -6733,13 +6733,23 @@ function frame(ts){
         applyCameraTransform();
         ctx.translate(sun.x, sun.y);
         ctx.rotate(rot);
-        // Per-ray gradient: bright at the sun edge, soft at the tip.
+        // Per-ray gradient: the inner section fades to zero within
+        // the sun's own radius (sR) using a circular falloff that
+        // mirrors the disc, so the sun sprite reads cleanly on top
+        // of the wedges instead of being overpainted at its centre.
+        // Brightness ramps in just past the disc edge and tapers
+        // out to transparent at rayLen — the wedge length itself
+        // is unchanged.
+        const sunFrac = sR / rayLen;          // sun edge as fraction of rayLen
         for(let i = 0; i < rayCount; i++){
           const a = (i / rayCount) * PI * 2;
-          const grad = ctx.createRadialGradient(0, 0, sR * 0.7, 0, 0, rayLen);
-          grad.addColorStop(0,    `rgba(255, 240, 170, ${rayAlpha})`);
-          grad.addColorStop(0.55, `rgba(255, 225, 130, ${rayAlpha * 0.45})`);
-          grad.addColorStop(1,    'rgba(255, 220, 110, 0)');
+          const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rayLen);
+          grad.addColorStop(0,                 'rgba(255, 253, 225, 0)');
+          grad.addColorStop(sunFrac * 0.55,    'rgba(255, 240, 170, 0)');
+          grad.addColorStop(sunFrac,           `rgba(255, 240, 170, ${rayAlpha})`);
+          grad.addColorStop(sunFrac + (1 - sunFrac) * 0.45,
+                                               `rgba(255, 225, 130, ${rayAlpha * 0.45})`);
+          grad.addColorStop(1,                 'rgba(255, 220, 110, 0)');
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.moveTo(0, 0);
