@@ -5944,8 +5944,8 @@ function renderHighscoreTable(targetId, optsOrHighlight){
       '<th>SLOTH</th>' +
       '<th class="when">WHEN</th>' +
       '<th class="lasted">LASTED</th>' +
-      '<th class="pts">SCORE</th>' +
       '<th class="lives">LIVES</th>' +
+      '<th class="pts">SCORE</th>' +
     '</tr>';
   for(let i = 0; i < rows.length; i++){
     const h = rows[i];
@@ -5956,8 +5956,8 @@ function renderHighscoreTable(targetId, optsOrHighlight){
         `<td class="name">${escapeHtml(h.name)}</td>` +
         `<td class="when">${escapeHtml(formatRelative(h.date))}</td>` +
         `<td class="lasted">${escapeHtml(formatGameDuration(h.survivedMonths))}</td>` +
-        `<td class="pts">${h.score}</td>` +
         `<td class="lives">${renderLivesCell(h)}</td>` +
+        `<td class="pts">${h.score}</td>` +
       '</tr>';
   }
   html += '</table>';
