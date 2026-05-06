@@ -1,0 +1,50 @@
+# Trim the build context so docker build is fast + reproducible.
+# The Containerfile only COPYs index.html, manifest.json, sw.js,
+# favicon.svg, and assets/ — anything else is dead weight.
+
+.git/
+.github/
+.claude/
+.gradle/
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# Tooling / build artifacts that are never part of the served app.
+node_modules/
+convex/_generated/
+.convex/
+.env*
+icons/
+android.keystore
+*.apk
+*.aab
+app/
+build/
+gradle/
+gradlew
+gradlew.bat
+build.gradle
+settings.gradle
+manifest-checksum.json
+store_icon.png
+
+# Source-of-truth files unrelated to the static payload.
+README.md
+GAMEPLAY.md
+TWA.md
+PLAN.md
+LICENSE
+helm/
+docker-compose.yml
+mise.toml
+package.json
+package-lock.json
+tsconfig.json
+twa-manifest.json
+sw.js.bak
+
+# NOTE: deploy/, Containerfile, and .dockerignore stay in the
+# build context — Containerfile COPYs deploy/nginx.conf.

@@ -1,0 +1,27 @@
+# Local serve target. Builds the Containerfile, runs nginx,
+# exposes the app on http://localhost:8080.
+#
+# Drive it via mise tasks:
+#   mise run serve:docker        # build + run
+#   mise run serve:docker:stop   # stop + remove
+#
+# Or directly:
+#   docker compose up --build
+#   docker compose down
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: slothlife:dev
+    container_name: slothlife
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
