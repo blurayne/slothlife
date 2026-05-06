@@ -300,19 +300,19 @@
        dev mode), so the player view never shows it. -->
   <div class="prow" style="margin-top:14px"><span class="pname"></span>
     <button id="b-lock-dev" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">EXIT DEV MODE</button></div>
-  <!-- RESTART is the dev-only re-roll: forces a fresh tree + scene.
-       Hidden from player mode so a casual visitor doesn't nuke
-       their run by accident. -->
-  <div class="prow"><span class="pname"></span>
-    <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RESTART</button></div>
   </div><!-- /.dev-only -->
 
-  <!-- Bottom-of-panel always-visible action: hard reset (clears
-       the SW cache + reloads the page). Same handler as the old
-       dev-only RELOAD button — just relabeled and promoted to the
-       player-facing slot. -->
-  <div class="prow" style="margin-top:18px"><span class="pname"></span>
+  <!-- Bottom-of-panel action — split by mode so exactly one button
+       shows up at a time:
+       * Dev mode → RESET: hard cache-clear + reload (b-refresh).
+         Useful when iterating on assets that the SW has pinned.
+       * Player mode → RESTART: re-rolls the tree + scene
+         (b-restart). The destructive action lives here for
+         players; devs get the cache-clear instead. -->
+  <div class="prow dev-only" style="margin-top:18px"><span class="pname"></span>
     <button id="b-refresh" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RESET</button></div>
+  <div class="prow player-only" style="margin-top:18px"><span class="pname"></span>
+    <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RESTART</button></div>
 
   <!-- Player footer: same two-line stamp as the dev-mode top
        row (env · version · build / date · SHA). Dev mode hides
