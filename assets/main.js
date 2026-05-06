@@ -51,11 +51,11 @@ const P = {
   fxVol:       0.57,
   // Master multiplier on the sun-shade effect — per-branch tint,
   // trunk gradient, and full-screen soft-light pass all scale by
-  // P.shadeStrength. 1.0 = original mild look; 1.4 (default) gives
-  // a noticeable rake without crushing colours. Exposed via the
-  // dev-mode SHADE STRENGTH slider; clamping happens at the call
-  // sites so values up to 6 remain visually sane.
-  shadeStrength: 1.4,
+  // P.shadeStrength. 1.0 = original mild look; 1.8 (default) gives
+  // a clearly readable rake without crushing colours. Exposed via
+  // the dev-mode SHADE STRENGTH slider; clamping happens at the
+  // call sites so values up to 6 remain visually sane.
+  shadeStrength: 1.8,
 };
 
 // ════════════════════════════════════════════════════════
