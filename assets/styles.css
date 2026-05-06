@@ -168,6 +168,16 @@
   .pversion-foot:empty{
     margin:0; padding:0; border:0;
   }
+  /* Footer link rows under the build-version line in the settings
+     panel (GitHub repo + Impressum). Match .pversion-foot's tiny
+     dim type, with an underline to mark the anchor. */
+  .pfoot-link a{
+    font-size:9px;
+    color:rgba(255,255,255,.30);
+    letter-spacing:.05em;
+    text-decoration:underline;
+  }
+  .pfoot-link a:hover{ color:rgba(255,255,255,.55); }
   .psec{
     font-size:9px;letter-spacing:.20em;
     color:rgba(180,210,255,.45);

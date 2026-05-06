@@ -1327,7 +1327,9 @@ const ovImprint      = document.getElementById('ov-imprint');
 const ovImprintBody  = document.getElementById('ov-imprint-body');
 const ovImprintClose = document.getElementById('ov-imprint-close');
 const rImprintStart  = document.getElementById('r-imprint-start');
+const rImprintPanel  = document.getElementById('r-imprint-panel');
 const bImprintStart  = document.getElementById('b-imprint-start');
+const bImprintPanel  = document.getElementById('b-imprint-panel');
 
 // Build the modal HTML. The env block goes through escapeHtml so
 // `<` `>` `&` `"` in addresses (e.g. e-mail brackets like
@@ -1406,7 +1408,11 @@ function closeImprintDialog(){
 
 if(_hasImprint){
   if(rImprintStart) rImprintStart.style.display = '';
+  if(rImprintPanel) rImprintPanel.style.display = '';
   if(bImprintStart) bImprintStart.addEventListener('click', (e) => {
+    e.preventDefault(); openImprintDialog();
+  });
+  if(bImprintPanel) bImprintPanel.addEventListener('click', (e) => {
     e.preventDefault(); openImprintDialog();
   });
 }
