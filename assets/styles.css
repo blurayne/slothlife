@@ -245,7 +245,12 @@
   /* ── OVERLAYS (start screen, name entry, highscore) ─────────── */
   .overlay{
     position:fixed;inset:0;
-    display:flex;align-items:center;justify-content:center;
+    /* `safe center` falls back to flex-start when the card is taller
+       than the viewport, so the top of the card is reachable by
+       scrolling. With plain `center`, an over-tall card centres past
+       the scrollable region and the title gets cut off — visible on
+       narrow phones. */
+    display:flex;align-items:safe center;justify-content:center;
     background:rgba(4,8,14,.78);
     backdrop-filter:blur(6px);
     -webkit-backdrop-filter:blur(6px);
@@ -297,6 +302,17 @@
     border-left:3px solid #FFE678;
     font-size:12px;line-height:1.45;
     color:#FFE678;letter-spacing:.04em;
+  }
+  /* NOTE — meta/session commentary styled distinctly from TIP
+     (which carries gameplay warnings). Calm blue accent vs. the
+     TIP's amber/warning accent. */
+  .ov-note{
+    margin-top:12px;
+    padding:8px 10px;
+    background:rgba(120,180,255,0.06);
+    border-left:3px solid #8FB6E8;
+    font-size:12px;line-height:1.45;
+    color:#8FB6E8;letter-spacing:.04em;
   }
   /* Toast — short message in the centre-top of the screen, fades
      out. Used to announce dev-mode toggles. */
