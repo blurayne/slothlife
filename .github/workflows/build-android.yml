@@ -90,14 +90,50 @@ jobs:
           set -euo pipefail
           npm i -g --no-audit --no-fund @bubblewrap/cli@latest
           # Log the version via npm rather than `bubblewrap --version`.
-          # Any direct bubblewrap invocation BEFORE init runs the
-          # first-run wizard (yes, even --version), and the wizard
-          # has no PTY/piped-answers wrapping until the dedicated
-          # init step below — so a bare `bubblewrap --version` here
-          # would dead-end with exit 130 the same way init used to.
-          # `npm ls` reads package.json off disk; no bubblewrap
-          # process spawns.
+          # Any direct bubblewrap invocation BEFORE the config file is
+          # in place runs the first-run wizard (yes, even --version),
+          # so a bare `bubblewrap --version` here would dead-end with
+          # exit 130. `npm ls` reads package.json off disk; no
+          # bubblewrap process spawns.
           npm ls -g --depth=0 @bubblewrap/cli || true
+
+      # Pre-write ~/.bubblewrap/config.json so the first-run wizard
+      # is skipped entirely.
+      #
+      # Verified against current main-branch source
+      # (packages/cli/src/lib/config.ts, function loadOrCreateConfig):
+      #
+      #   if (!config.jdkPath)        { …prompt… }
+      #   if (!config.androidSdkPath) { …prompt… }
+      #
+      # The wizard ONLY fires when these fields are falsy. There's no
+      # filesystem-existence re-check, no env-var bypass, no CLI flag
+      # to disable the prompt — the config file is the only documented
+      # escape hatch (issues #172, #243, #806 all confirm the
+      # maintainer hasn't shipped any other automation surface).
+      #
+      # Building the JSON via printf — heredoc indentation / shell-
+      # expansion gotchas previously produced subtly-invalid JSON,
+      # which made Config.loadConfig throw, loadOrCreateConfig caught
+      # the throw and fell back to `new Config('', '')` (both fields
+      # empty), and the wizard ran anyway. The printf form is
+      # canonical-single-line JSON and the python step verifies it
+      # parses before any bubblewrap command runs.
+      - name: Pre-configure Bubblewrap (skip first-run wizard)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.bubblewrap"
+          ANDROID_SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          : "${JAVA_HOME:?JAVA_HOME must be set by setup-java}"
+          test -d "$JAVA_HOME"        || { echo "::error::JAVA_HOME path missing: $JAVA_HOME"; exit 1; }
+          test -d "$ANDROID_SDK_PATH" || { echo "::error::Android SDK path missing: $ANDROID_SDK_PATH"; exit 1; }
+          printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' \
+            "$JAVA_HOME" "$ANDROID_SDK_PATH" \
+            > "$HOME/.bubblewrap/config.json"
+          echo "--- ~/.bubblewrap/config.json ---"
+          cat "$HOME/.bubblewrap/config.json"
+          python3 -c "import json,sys; json.load(open(sys.argv[1])); print('VALID JSON')" \
+            "$HOME/.bubblewrap/config.json"
 
       # Throwaway debug keystore so the build completes end-to-end
       # without operator interaction. SHA-256 fingerprint is printed
@@ -128,65 +164,23 @@ jobs:
             -storepass "${BUBBLEWRAP_KEYSTORE_PASSWORD}" \
             | grep -E '^\s*SHA256:' || true
 
-      # First-run wizard handling:
-      #
-      # Bubblewrap's first command on a fresh HOME walks the user
-      # through a four-prompt setup wizard:
-      #
-      #   1. "Do you want Bubblewrap to install the JDK (recommended)?
-      #      (Enter \"No\" to use your own JDK 17 installation) (Y/n)"
-      #   2. "Path to your existing JDK 17 installation:"
-      #   3. "Do you want Bubblewrap to install the Android SDK
-      #      (recommended)? (Y/n)"
-      #   4. "Path to your existing Android SDK installation:"
-      #
-      # Earlier failed attempts:
-      #   * Pre-writing ~/.bubblewrap/config.json — current CLI runs
-      #     the wizard regardless of an existing config file.
-      #   * Closing stdin (exec </dev/null) — inquirer treats EOF as
-      #     cancel and SIGINTs with exit code 130.
-      #   * `printf … | bubblewrap init` — bubblewrap's wizard uses
-      #     `inquirer`, which reads directly from /dev/tty rather
-      #     than process.stdin, so a plain pipe never reaches the
-      #     prompts; inquirer sees no TTY and bails with SIGINT 130.
-      #
-      # The fix that actually works: run bubblewrap under `script(1)`,
-      # which allocates a real pseudo-terminal for the child process.
-      # inquirer then sees an isTTY=true stdin, accepts our piped
-      # answers as if a human were typing, and the wizard runs to
-      # completion. `script` is part of util-linux and is
-      # pre-installed on ubuntu-latest runners.
-      #
-      # `script -qec "<cmd>" /dev/null`:
-      #   -q  quiet ("Script started/done" silenced)
-      #   -e  exit with the wrapped command's exit code
-      #   -c  command to run inside the PTY
-      #   /dev/null  discard the typescript log
+      # bubblewrap init reads twa-manifest.json from the repo and
+      # generates the Gradle scaffolding. With the config pre-written
+      # above, no prompts fire — `--version` here is a smoke-test
+      # that the wizard is truly bypassed before the longer init
+      # step runs. If the wizard ever returns, this short call is
+      # where it'll fail, with full diagnostic context (config file
+      # contents printed in the previous step).
       - name: Generate TWA project
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          ANDROID_SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          echo "JAVA_HOME=${JAVA_HOME}"
-          echo "ANDROID_SDK_PATH=${ANDROID_SDK_PATH}"
-          which script && script --version | head -1
-          # Four-line answer block — order must match the prompt
-          # sequence above. printf | script feeds the PTY, then the
-          # PTY feeds inquirer.
-          printf 'n\n%s\nn\n%s\n' "$JAVA_HOME" "$ANDROID_SDK_PATH" | \
-            script -qec "bubblewrap init \
-              --directory=. \
-              --manifest=https://blurayne.github.io/slothlife/manifest.json \
-              --skipPwaValidation" /dev/null || true
-          echo "--- persisted ~/.bubblewrap/config.json ---"
-          cat "$HOME/.bubblewrap/config.json" || true
-          # Now that init has persisted the config, every subsequent
-          # bubblewrap call is prompt-free. Log the runtime version
-          # here for diagnostics — safe to run direct since the
-          # wizard is gone.
-          bubblewrap --version || true
-          # update runs prompt-free with stdin closed as a safety net.
-          bubblewrap update --skipVersionUpgrade </dev/null || true
+          bubblewrap --version
+          bubblewrap init \
+            --directory=. \
+            --manifest=https://blurayne.github.io/slothlife/manifest.json \
+            --skipPwaValidation || true
+          bubblewrap update --skipVersionUpgrade || true
 
       # Bubblewrap's build prompts for the keystore + key passwords
       # if they're not in env vars (not even `--skipPwaValidation`
