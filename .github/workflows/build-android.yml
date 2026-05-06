@@ -203,18 +203,62 @@ jobs:
       #     - generateTwaProject has ZERO inquirer prompts.
       #     - updateProject has ONE prompt (promptNewAppVersionName)
       #       gated on `skipVersionUpgrade`.
-      #   Pass --skipVersionUpgrade and update runs fully non-
-      #   interactively, regenerates the Gradle scaffolding from
-      #   twa-manifest.json (the repo has one with packageId,
-      #   signingKey, etc.), and writes the checksum file that
-      #   `bubblewrap build`'s hasManifestChanged() reads.
       #
-      # The trailing `ls -la` confirms the checksum landed.
+      # Icon-fetch wrinkle: update fetches iconUrl + maskableIconUrl
+      # from twa-manifest.json (so the bitmaps can be bundled into
+      # the APK). Those URLs point at the deployed Pages site, but
+      # on a fresh push this workflow races the Pages deploy and
+      # hits 404. Workaround: spin up a local HTTP server in the
+      # icon-render output dir and rewrite the two URLs in
+      # twa-manifest.json to localhost just for this step. The
+      # bitmaps end up identical to what Pages serves (rendered
+      # from the same SVG by the workflow's earlier render step).
+      # Other URL fields (host, webManifestUrl, fullScopeUrl) are
+      # NOT rewritten — they're recorded into the APK's resources
+      # for runtime use against the real Pages site.
       - name: Generate TWA project
         timeout-minutes: 10
         run: |
           set -euo pipefail
           bubblewrap --version
+
+          # Serve the locally-rendered icons.
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/icon-srv.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          # Wait briefly for the server to come up + sanity-check the
+          # two icons are reachable. Fail fast if either 404s — means
+          # the icon-render step earlier didn't produce the file.
+          for _ in 1 2 3 4 5; do
+            curl -fsS -o /dev/null http://127.0.0.1:8765/icons/icon-512.png && break
+            sleep 0.3
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:8765/icons/icon-512.png
+          curl -fsS -o /dev/null http://127.0.0.1:8765/icons/icon-mask-512.png
+
+          # Rewrite ONLY the two icon URLs to point at the local
+          # server. iconUrl + maskableIconUrl are fetch-time only —
+          # bubblewrap downloads the bitmaps and bakes them into
+          # the APK as drawable resources. The URLs themselves don't
+          # end up in the APK's runtime config (that uses host,
+          # webManifestUrl, fullScopeUrl, startUrl, which we leave
+          # alone so they continue to point at the deployed PWA).
+          # No need to restore the canonical URLs after — the
+          # checksum + manifest stay consistent within this CI run.
+          python3 - <<'PY'
+          import json
+          with open('twa-manifest.json') as f: m = json.load(f)
+          for k in ('iconUrl', 'maskableIconUrl'):
+              if k in m and m[k]:
+                  m[k] = m[k].replace(
+                      'https://blurayne.github.io/slothlife/',
+                      'http://127.0.0.1:8765/')
+          with open('twa-manifest.json', 'w') as f:
+              json.dump(m, f, indent=2)
+          PY
+          echo "--- patched iconUrl + maskableIconUrl ---"
+          grep -E '"(icon|maskableIcon)Url"' twa-manifest.json
+
           bubblewrap update --skipVersionUpgrade
           ls -la manifest-checksum.json twa-manifest.json
 
