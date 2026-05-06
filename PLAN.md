@@ -11,6 +11,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped this batch
 
+- [x] **Sun shade extends to sloth body, head, and arms** (legs unaffected)
 - [x] **Add "Super Sloth Bros Chill" as the second background music track**
 - [x] Unicode-safe highscore names (faulbär → FAULBÄR) — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
 - [x] Settings panel: gate dev controls behind a 2.5s long-press on the gear — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)

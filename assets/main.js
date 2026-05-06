@@ -3092,6 +3092,19 @@ _eat(dt){
   // ─────────────────────────────────────────────────────
   draw(){
     if(!this.alive) return;
+    // SUN SHADE — per-element directional tint, same model as branches:
+    // sloth on the sun side warms up, sloth on the shadow side darkens.
+    // Cached once so _drawBody and _drawLimb share one number. Charred
+    // sloth is forced to black via ctx.filter, so the tint would be
+    // invisible — skip it.
+    if(_sunBias && !this.charred){
+      const sxBase = (this.state === 'FALLING' || (this.state === 'STARVING' && this.starveLetGo))
+        ? this.fx : this.displayX;
+      const sideNorm = Math.max(-1, Math.min(1, (sxBase - W * 0.5) / (W * 0.5)));
+      this._slothLit = sideNorm * _sunBias;
+    } else {
+      this._slothLit = 0;
+    }
     ctx.save();
     ctx.globalAlpha = this.alpha;
     const charStart = this.charred;
@@ -3247,7 +3260,9 @@ _eat(dt){
     const reachMul = (limb.state === 'REACHING') ? P.armReach : 1.0;
     const ik = solve2IK(sx, sy, tx, ty, upper * reachMul, lower * reachMul, limb.side);
     const w = limb.isArm ? 4.5 : 5.0;
-    const col = limb.isArm ? '#735A38' : '#7A6342';
+    // SUN SHADE — only arms get the directional tint (legs stay flat
+    // per the user-facing scope of the toggle).
+    const col = limb.isArm ? this._shaded(0x73, 0x5A, 0x38) : '#7A6342';
     this._seg(sx, sy, ik.e, ik.h, w, col);
     if(limb.gripped){
       const tan = getBranchTangent(limb.branch, limb.t);
@@ -3270,7 +3285,7 @@ _eat(dt){
       const lower = limb.isArm ? this.ARM_LOW : this.LEG_LOW;
       const ik = solve2IK(sx, sy, tx, ty, upper, lower, limb.side);
       const w = limb.isArm ? 4.5 : 5.0;
-      const col = limb.isArm ? '#735A38' : '#7A6342';
+      const col = limb.isArm ? this._shaded(0x73, 0x5A, 0x38) : '#7A6342';
       this._seg(sx, sy, ik.e, ik.h, w, col);
     }
   }
@@ -3378,6 +3393,20 @@ _eat(dt){
     }
   }
 
+  // SUN SHADE helper: tint a base RGB by the cached this._slothLit.
+  // Mirrors Branch.draw's warm/cool ramp so body/head/arms react in
+  // lock-step with the trunk and canopy.
+  _shaded(r, g, b){
+    const lit = this._slothLit;
+    if(!lit) return `rgb(${r},${g},${b})`;
+    if(lit > 0){
+      const k = Math.min(1, lit * 0.40 * P.shadeStrength);
+      return `rgb(${Math.round(r + (235 - r) * k)},${Math.round(g + (200 - g) * k)},${Math.round(b + (140 - b) * k)})`;
+    }
+    const k = Math.min(1, -lit * 0.45 * P.shadeStrength);
+    return `rgb(${Math.round(r * (1 - k))},${Math.round(g * (1 - k))},${Math.round(b * (1 - k))})`;
+  }
+
   _drawBody(bx,by){
     const {BW,BH,HR}=this;
 
@@ -3388,7 +3417,7 @@ _eat(dt){
 
     // ── BODY with 3D radial shading (light from upper-right) ──
     ctx.beginPath(); ctx.ellipse(bx,by,BWs,BH,0,0,PI*2);
-    ctx.fillStyle='#8B6C42'; ctx.fill();
+    ctx.fillStyle=this._shaded(0x8B, 0x6C, 0x42); ctx.fill();
     const bodyGrad = ctx.createRadialGradient(bx+BWs*0.30, by-BH*0.30, BWs*0.10, bx, by, BWs*1.15);
     bodyGrad.addColorStop(0,    'rgba(195,158,108,0.75)');
     bodyGrad.addColorStop(0.30, 'rgba(140,108,68,0)');
@@ -3406,7 +3435,7 @@ _eat(dt){
     // ── HEAD: warm chestnut brown, big rounded silhouette ──
     const hy = by + BH - 2;
     ctx.beginPath(); ctx.ellipse(bx, hy, HR*1.08, HR*.98, 0, 0, PI*2);
-    ctx.fillStyle='#7A4A28'; ctx.fill();
+    ctx.fillStyle=this._shaded(0x7A, 0x4A, 0x28); ctx.fill();
     // 3D shading
     const headGrad = ctx.createRadialGradient(bx+HR*0.30, hy-HR*0.30, HR*0.10, bx, hy, HR*1.15);
     headGrad.addColorStop(0,    'rgba(205,150,95,0.75)');
