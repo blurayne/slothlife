@@ -406,7 +406,11 @@ applyPanelState();
     // the row can never appear (the standalone display-mode also
     // covers TWA / Android-Chrome PWA / iOS standalone navigator).
     const isStandalone = (
-      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      (window.matchMedia && (
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        window.matchMedia('(display-mode: minimal-ui)').matches
+      )) ||
       window.navigator.standalone === true
     );
     if(!isStandalone){
