@@ -6842,9 +6842,21 @@ function frame(ts){
 // sliders, season toggles, …) are intentionally NOT saved — those
 // reset to their hard-coded defaults on every visit.
 const PLAYER_PREFS_KEY = 'sloth-player-prefs';
+// Bump this to force every returning visitor's saved player-prefs
+// blob to be discarded on their next load, falling back to the
+// in-code defaults. Use cases: changing a default that's also
+// persisted (pixelMode, blurBgMode, sunShadeMode, musicVol, …),
+// or recovering from a bad value pushed live. Plain ms-since-epoch
+// integer — `Date.UTC(YYYY, monthIdx, day, hour?)` (monthIdx is
+// 0-based, so `4` = May). Saves stamped at or after this moment
+// are kept; older / unstamped saves are dropped. Highscores,
+// client-id and dev-mode flag live under other keys and are
+// unaffected.
+const FORCED_PREFS_TIMESTAMP = Date.UTC(2026, 4, 6); // 2026-05-06 00:00 UTC
 function savePlayerPrefs(){
   try {
     localStorage.setItem(PLAYER_PREFS_KEY, JSON.stringify({
+      savedAt:      Date.now(),
       pixelMode,
       pixelSize:    P.pixelSize,
       blurBgMode,
@@ -6863,6 +6875,14 @@ function loadPlayerPrefs(){
     const raw = localStorage.getItem(PLAYER_PREFS_KEY);
     p = raw ? (JSON.parse(raw) || {}) : {};
   } catch(_){ p = {}; }
+
+  // Forced reset: stored prefs older than the current code-level
+  // floor (or unstamped legacy saves) are ignored, so the in-code
+  // defaults stand. The next savePlayerPrefs() will overwrite the
+  // stale blob with a fresh `savedAt`; we deliberately don't
+  // removeItem here so a session with no further interactions
+  // simply leaves it harmlessly stale.
+  if(typeof p.savedAt !== 'number' || p.savedAt < FORCED_PREFS_TIMESTAMP) return;
 
   if(typeof p.pixelMode    === 'boolean') pixelMode    = p.pixelMode;
   if(typeof p.blurBgMode   === 'boolean') blurBgMode   = p.blurBgMode;
