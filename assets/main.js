@@ -700,19 +700,35 @@ const Audio = {
       .then(buffer => {
         this._musicBuffers[url] = buffer;
         if(this._musicLoadingUrl === url) this._musicLoadingUrl = null;
-        // Kick off playback if music is wanted and the user hasn't
-        // switched to a different track in the meantime.
-        if(this._musicWanted && this.currentTrack().url === url) this.startMusic();
+        // Kick playback if music is wanted and nothing is currently
+        // playing. Two cases:
+        //   (a) the freshly-loaded URL is still the user's choice —
+        //       startMusic() reads that buffer and starts.
+        //   (b) the user clicked NEXT TRACK while this one was
+        //       loading — startMusic() re-resolves currentTrack()
+        //       and either plays its cached buffer or kicks off a
+        //       fresh fetch. Without this, the user lands in
+        //       silence after a mid-load track switch.
+        if(this._musicWanted && !this._musicSource) this.startMusic();
         cb && cb();
       })
       .catch(err => {
-        console.warn('Music sample load failed:', err);
+        console.warn('Music sample load failed for', url, ':', err);
         if(this._musicLoadingUrl === url) this._musicLoadingUrl = null;
+        // Don't auto-advance to the next track — that could spin
+        // forever on a total network outage. State is reset so the
+        // next click on NEXT TRACK retries cleanly.
       });
   },
   startMusic(){
     this._musicWanted = true;
     if(!this.enabled || !this.ctx) return;
+    // Browsers auto-suspend the AudioContext on backgrounded tabs;
+    // resume here so a returning user doesn't silently get a
+    // running source on a suspended context.
+    if(this.ctx.state === 'suspended'){
+      try { this.ctx.resume(); } catch(_){}
+    }
     this._ensureMusicBuffer();
     const buffer = this._musicBuffers[this.currentTrack().url];
     if(!buffer) return;                   // still loading — will retry on decode
@@ -768,6 +784,12 @@ const Audio = {
         // Wait past the 700ms fade-out so the two tracks don't overlap.
         setTimeout(() => { if(this._musicWanted) this.startMusic(); }, 750);
       }
+    } else if(this._musicWanted){
+      // Music is wanted but nothing is currently playing — most
+      // likely the previous track was still loading (or its load
+      // failed) when the user pressed NEXT TRACK. Kick the new
+      // track immediately rather than leaving the user in silence.
+      this.startMusic();
     }
     return this.currentTrack();
   },
