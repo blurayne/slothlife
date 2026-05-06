@@ -135,20 +135,28 @@ jobs:
       #      (recommended)? (Y/n)"
       #   4. "Path to your existing Android SDK installation:"
       #
-      # An earlier attempt pre-wrote ~/.bubblewrap/config.json hoping
-      # to skip the wizard, but the current Bubblewrap CLI runs it
-      # anyway. Closing stdin (exec </dev/null) made the inquirer
-      # prompt SIGINT with exit 130 because EOF is treated as cancel,
-      # not as the (Y/n) default.
+      # Earlier failed attempts:
+      #   * Pre-writing ~/.bubblewrap/config.json — current CLI runs
+      #     the wizard regardless of an existing config file.
+      #   * Closing stdin (exec </dev/null) — inquirer treats EOF as
+      #     cancel and SIGINTs with exit code 130.
+      #   * `printf … | bubblewrap init` — bubblewrap's wizard uses
+      #     `inquirer`, which reads directly from /dev/tty rather
+      #     than process.stdin, so a plain pipe never reaches the
+      #     prompts; inquirer sees no TTY and bails with SIGINT 130.
       #
-      # The robust fix is to *answer* the four prompts directly via
-      # printf piped to stdin: "n" + JAVA_HOME + "n" + ANDROID_HOME.
-      # That tells Bubblewrap to reuse the JDK that setup-java wrote
-      # to JAVA_HOME and the Android SDK that ships pre-installed on
-      # ubuntu-latest under ANDROID_HOME. Once init runs to the end
-      # it persists those choices in ~/.bubblewrap/config.json, so
-      # subsequent commands (update, build) no longer prompt and can
-      # safely run with a closed stdin.
+      # The fix that actually works: run bubblewrap under `script(1)`,
+      # which allocates a real pseudo-terminal for the child process.
+      # inquirer then sees an isTTY=true stdin, accepts our piped
+      # answers as if a human were typing, and the wizard runs to
+      # completion. `script` is part of util-linux and is
+      # pre-installed on ubuntu-latest runners.
+      #
+      # `script -qec "<cmd>" /dev/null`:
+      #   -q  quiet ("Script started/done" silenced)
+      #   -e  exit with the wrapped command's exit code
+      #   -c  command to run inside the PTY
+      #   /dev/null  discard the typescript log
       - name: Generate TWA project
         timeout-minutes: 10
         run: |
@@ -156,14 +164,15 @@ jobs:
           ANDROID_SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           echo "JAVA_HOME=${JAVA_HOME}"
           echo "ANDROID_SDK_PATH=${ANDROID_SDK_PATH}"
+          which script && script --version | head -1
           # Four-line answer block — order must match the prompt
-          # sequence above. Each answer is on its own line so any
-          # line-buffered prompt reader picks them up cleanly.
+          # sequence above. printf | script feeds the PTY, then the
+          # PTY feeds inquirer.
           printf 'n\n%s\nn\n%s\n' "$JAVA_HOME" "$ANDROID_SDK_PATH" | \
-            bubblewrap init \
+            script -qec "bubblewrap init \
               --directory=. \
               --manifest=https://blurayne.github.io/slothlife/manifest.json \
-              --skipPwaValidation || true
+              --skipPwaValidation" /dev/null || true
           echo "--- persisted ~/.bubblewrap/config.json ---"
           cat "$HOME/.bubblewrap/config.json" || true
           # Config is now persisted, so update runs prompt-free with
