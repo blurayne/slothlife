@@ -2018,11 +2018,11 @@ loadHighscores();
 let scorePopups = [];   // {x, y, vy, age, life, text, color}
 let leafFlashes = new Map();  // branch → countdown (1→0)
 const HUNGER_DECAY_AWAKE  = 1 / 120;
-// Sleeping drains hunger at 20% of the awake rate — i.e. 80% energy
+// Sleeping drains hunger at 18% of the awake rate — i.e. 82% energy
 // saving while asleep. Sleep is the survival lever in this game; a
 // large gap between awake/asleep rates rewards the player for letting
 // the sloth nap when food is scarce, matching real-sloth biology.
-const HUNGER_DECAY_ASLEEP = HUNGER_DECAY_AWAKE * 0.20;
+const HUNGER_DECAY_ASLEEP = HUNGER_DECAY_AWAKE * 0.18;
 const HUNGER_LEAF_GAIN    = 0.01;
 const HUNGER_APPLE_GAIN   = 0.10;
 // Trunk has its own (very stiff) spring — bends gently under heavy gusts.
@@ -6743,8 +6743,8 @@ function frame(ts){
   // Game-over → either prompt for name or show end screen
   _checkPostGameTransition();
 
-  // Hunger decay. While SLEEPING the rate is 20% of the awake rate
-  // (HUNGER_DECAY_ASLEEP = HUNGER_DECAY_AWAKE × 0.20) — 80% energy
+  // Hunger decay. While SLEEPING the rate is 18% of the awake rate
+  // (HUNGER_DECAY_ASLEEP = HUNGER_DECAY_AWAKE × 0.18) — 82% energy
   // saving while asleep. At 0 → starvation.
   if(sloth && sloth.alive && !gameOver){
     if(sloth.state !== 'STARVING'){
