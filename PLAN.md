@@ -6,11 +6,21 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Open
 
-- [x] Anti-tampering #1: server-side plausibility cap on highscore submit — [plan](.claude/plans/highscore-anti-tampering.md)
-- [x] Anti-tampering #2: per-anonymous-clientId rate-limit (3 / 60 s) — [plan](.claude/plans/highscore-anti-tampering.md)
+_(none — see "Shipped this batch" below.)_
 
 ## Shipped this batch
 
+- [x] **Bubblewrap CI hardening** — non-interactive Android workflow (config pre-write, SDK-layout symlink, `init` → `update` swap, local icon-server) — [plan](.claude/plans/bubblewrap-ci-hardening.md)
+- [x] **PWA install button + fullscreen on installed launch** — wire missing DOM, flip manifest `display` to `fullscreen` — [plan](.claude/plans/pwa-install-button-and-fullscreen.md)
+- [x] **Declare GPL-3.0-or-later + audit third-party credits** — drop canonical `LICENSE`, fill `package.json` field, rewrite README credits — [plan](.claude/plans/license-gpl3-and-credits-audit.md)
+- [x] **Highscores: track survival time + cause-of-death per life** — six-column LIVES-icons render, additive Convex schema — [plan](.claude/plans/highscores-cause-of-death-and-survival-time.md)
+- [x] **PWA polish: apple-touch-icon + manifest id/lang/categories** — iOS install polish + 180×180 icon render in deploy workflow — [plan](.claude/plans/pwa-polish-apple-icons-and-manifest.md)
+- [x] **Winter ends one month earlier** — five `<3` → `<2` swaps in `getSeasonInfo`, winterness fade-out shifts to `[1.5, 2)`
+- [x] **`fallGravity` default 1.0 → 1.8** — falls feel weightier
+- [x] **Settings sliders +30% wider** — `input[type=range]` 130 → 170 px
+- [x] **Start-screen NOTE rewritten** — TIP block becomes the poetic "see it through and you'll have earned the title of sloth" NOTE; DEV long-press hint dropped
+- [x] Anti-tampering #1: server-side plausibility cap on highscore submit — [plan](.claude/plans/highscore-anti-tampering.md)
+- [x] Anti-tampering #2: per-anonymous-clientId rate-limit (3 / 60 s) — [plan](.claude/plans/highscore-anti-tampering.md)
 - [x] **Sun rays draw before clouds** so a passing cloud occludes the rays as well as the disc — [plan](.claude/plans/forced-prefs-timestamp-and-rays-behind-clouds.md)
 - [x] **`FORCED_PREFS_TIMESTAMP`: bump to force-reset stale player-prefs blobs** — [plan](.claude/plans/forced-prefs-timestamp-and-rays-behind-clouds.md)
 - [x] **HTML title → "A Sloth's Life" + sloth-face SVG favicon**
