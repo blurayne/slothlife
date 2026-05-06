@@ -39,7 +39,7 @@ All values are at the default `dayPace = 1.0`, `hungerPace = 2.0`
 | `P.hungerPace` | 2.0 default | `main.js:47` |
 | `DAY_CYCLE_S` | 90 real sec / in-game day | `main.js:4703` |
 | `P.endMonths` | 30 (full game) | `main.js:49` |
-| Apple density | 0.10 per deep branch (set at start) | `main.js:43, 4007` |
+| Apple density | 0.10 per deep branch (regrows each Jul-Aug) | `main.js:43, 4007, 4172-4193` |
 | Leaf eaten | +1 score, +1 % hunger | `main.js:2810, 2027` |
 | Apple eaten | +15 score, +10 % hunger | `main.js:2816, 2027` |
 | Month survived | +50 score | `main.js:6741` |
@@ -127,7 +127,8 @@ do not.
 | **Apr (m=3)** | Game-start. Take stock: count apples on the tree. Eat any that are within easy reach to top off hunger toward 100 %. |
 | **May (m=4)** | Continue eating apples opportunistically. Score: +15 each. They won't last past autumn. |
 | **Jun (m=5)** | Last reliable apple-feast month. After this, summer arrives and the sleep-block becomes a real risk. |
-| **Jul-Sep (m=6-8)** | **Summer.** Stay above 10 % hunger. Eat one apple any time hunger drops below ~25-30 %. Sleep when it's safe. |
+| **Jul-Aug (m=6-7)** | **Summer apple regrowth window.** New apples appear on the tree (`main.js:4172-4193`). Stay above 10 % hunger so the summer-wake rule doesn't trigger; eat one apple any time hunger drops below ~25-30 %. |
+| **Sep (m=8)** | Last summer month. Apples have stabilised; stockpile what's there before autumn knocks them off. Still summer rules — keep hunger above 10 %. |
 | **Oct-Nov (m=9-10)** | **Autumn — apple shower.** Apples drop randomly. Watch for ground-apples and let the sloth's arm extend to grab them. This is the score-farming window. |
 | **Dec (m=11)** | Last stragglers drop. Stockpile hunger toward 100 % before winter. |
 | **Jan-Feb (m=0-1)** | **Winter.** Tree is bare. Pure sleep. Survive on the autumn stockpile. |
@@ -146,7 +147,7 @@ feeding the sloth enough to outlast winter 2 and winter 3.
 |---|---|---|---|
 | Months survived | +50 | 30 mo × 50 = +1 500 | **Yes — biggest single contributor** |
 | Lives kept on win | +250 | 3 × 250 = +750 | Yes — second biggest |
-| Apples eaten | +15 | finite (depends on tree) | Modest contribution |
+| Apples eaten | +15 | semi-renewable: tree regrows up to density every Jul-Aug (`main.js:4172-4193`) | Solid mid-game contribution |
 | Leaves eaten | +1 | semi-renewable | Negligible |
 
 **Realistic ceiling at default settings:** survive all 30 months
@@ -213,3 +214,122 @@ post-2026-05-06 values:
 - Winter band shortened from 3 months to 2 months (Jan-Feb only).
 
 If those drift, the numeric tables above need a refresh.
+
+## Is winning even possible? How big is the chance?
+
+Yes — but it's tighter than the start screen suggests, and a
+casual play-through is unlikely to make it to month 30.
+
+### What "winning" means in code
+
+The win check is a single line at `main.js:6750-6751`:
+
+```js
+if(P.endMonths > 0 && gameDaysElapsed >= P.endMonths) _endGame(true);
+```
+
+Reach 30 in-game months with **at least one life remaining**
+and the game flips to the win banner. Lose all 3 lives before
+month 30 → loss banner. Apples eaten doesn't matter; survival
+time is the only condition.
+
+### The hunger budget
+
+Across the full 45-minute game the sloth burns roughly:
+
+| Awake fraction | Effective drain | Drain over 30 mo |
+|---|---|---|
+| 5 % | `0.95 × 0.003 + 0.05 × 0.0167` ≈ 0.0037 / s | ≈ **10.0 hunger units** |
+| 1 % (near-perfect sleep) | ≈ 0.0031 / s | ≈ **8.5 hunger units** |
+
+Even with near-perfect sleep, you have to refill ~7-9 hunger
+units of food across the game.
+
+### The hunger supply
+
+| Source | Amount | Hunger value |
+|---|---|---|
+| Starting hunger | 1.0 | 1.0 |
+| Two respawns at 0.80 (after losing 2 lives) | +0.80 × 2 | 1.6 (only if you let those lives starve) |
+| Apples — 4 harvests of ~10 fruit (Apr year 1 + Jul-Aug years 1-3) | ~30-40 fruit @ 0.10 | **~3.0-4.0** |
+| Leaves — eaten through 3 spring regrowths, capped by initial `fullLeafCount` and reduced each time you eat one | rough estimate ~150-300 @ 0.01 | **~1.5-3.0** |
+| **Realistic total available** | | **~7-10** |
+
+Conclusion: the supply is tight against the demand. The game
+*is* winnable, but it requires you to harvest most of what's on
+the tree across both food sources. A run that ignores apples
+or leaves can't make 30 months even with perfect sleep.
+
+### Lightning is the second wall
+
+Lightning fires only during thunderstorms (rain intensity > 0.65
+plus a 55 % per-storm thunder roll, see `main.js:5117`). Storms
+themselves run a 14-36 s storm + 35-105 s dry cycle.
+
+Math (approximate, all RNG):
+
+- ≈ 95 s per storm cycle, 35 % of storms have thunder.
+- Thunder time per cycle: 25 s storm × 0.35 ≈ 9 s.
+- Strike attempts during thunder: 1 per 13 s on average.
+- Hit roll per attempt: 5 %.
+- **Expected lightning hits in a 45-min game: ~1.**
+
+So on average lightning takes **one life** per game. With 3
+lives that's manageable, but RNG can run hot — variance is
+~1 hit, so 2-3 hits in a single run isn't rare. Each hit kills
+the current life immediately.
+
+### Putting it together — win odds by player tier
+
+These are estimates from the math above, not measured. They
+assume default constants (post-2026-05-06 values) and the
+default tree-generation seed.
+
+| Tier | Behaviour | Lightning luck needed | Win rate |
+|---|---|---|---|
+| Random tapper, never sleeps | Awake-only run dies in ~3 min | n/a (dead before lightning matters) | **<1 %** |
+| Casual sleeper, eats opportunistically | Sleeps when idle but ignores summer regrowth + autumn drops | normal (1 hit) | **~10-15 %** |
+| Strategic player | Eats every available apple, snacks on leaves in spring 2 + 3, manages summer-wake rule, sacrifices life 1 to a summer starvation if needed | normal (1 hit) | **~40-55 %** |
+| Expert + good RNG | All of the above + lucky lightning (0 hits) + good tree (above-median apple/leaf count) | very good (≤1 hit) | **~70-80 %** |
+| Expert + bad RNG | All of the above + 3+ lightning hits | impossible (no lives left) | **~10 %** even for expert play |
+
+### What "best possible" looks like
+
+A theoretical win with all 3 lives kept and every apple/leaf
+maximised:
+
+- Months: 30 × 50 = **+1 500**
+- Lives: 3 × 250 = **+750**
+- Apples: ~35 × 15 = **+525**
+- Leaves: ~250 × 1 = **+250**
+- **Total: ~3 025 points**
+
+Realistic winning score (1 life lost, average food gathering):
+**~2 000-2 200**.
+
+If the leaderboard's top scores cluster at 2 000-2 500 the
+hunger economy is tuned about right. If they cluster <1 000
+nobody is winning, and the multipliers (or food density)
+should probably loosen. If they cluster ≥2 800 the win is too
+easy.
+
+### The two RNG-based reasons a winnable run can still fail
+
+1. **Three lightning hits in one game** (≈ 8 % per the Poisson
+   estimate above). Bad luck. No counterplay other than ducking
+   into STARVING / FALLING states the moment thunder is audible
+   — but those cost a life by themselves, so it's not really a
+   strategy.
+2. **Sparse tree generation.** The `appleCount` density is a
+   probability per branch, not a count. If RNG gives a tree
+   with few deep branches, you may simply not have enough
+   apples + leaves in the world to refill 7-9 hunger units.
+   Reroll by restarting a fresh game.
+
+### TL;DR
+
+> Yes, the game is winnable. Plan on harvesting almost
+> everything the tree produces. Expect to lose one life to
+> lightning. Keep an eye on summer-wake hunger. A skilled
+> player wins ~50 % of the time at default settings; an expert
+> with calm thunder ~75 %.
