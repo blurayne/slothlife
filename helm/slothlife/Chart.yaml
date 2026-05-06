@@ -1,0 +1,17 @@
+apiVersion: v2
+name: slothlife
+description: A Sloth's Life — windy-tree sloth adventure (static SPA + service worker, served by nginx).
+type: application
+version: 0.1.0
+appVersion: "0.0.0"
+home: https://github.com/blurayne/slothlife
+sources:
+  - https://github.com/blurayne/slothlife
+maintainers:
+  - name: blurayne
+    url: https://github.com/blurayne
+keywords:
+  - game
+  - pwa
+  - static
+icon: https://blurayne.github.io/slothlife/icons/icon-512.png

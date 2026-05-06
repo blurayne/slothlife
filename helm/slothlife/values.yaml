@@ -1,0 +1,89 @@
+# Default values for the slothlife Helm chart. Override any
+# field via `helm install ... -f my-values.yaml` or `--set`.
+
+replicaCount: 2
+
+image:
+  # Push the Containerfile-built image to your registry of
+  # choice; ghcr.io/blurayne/slothlife is the default origin.
+  repository: ghcr.io/blurayne/slothlife
+  # Empty -> falls back to .Chart.AppVersion in templates.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: slothlife.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+    # - secretName: slothlife-tls
+    #   hosts:
+    #     - slothlife.example.com
+
+# Static SPA served by nginx — minimal footprint.
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# nginx:alpine ships an `nginx` user (UID 101). The container's
+# /var/cache/nginx + /var/run need write access, so the rootfs
+# stays read-write here. Flip readOnlyRootFilesystem to true if
+# you also mount emptyDirs at those paths.
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsUser: 101
+  runAsGroup: 101
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 2
+  periodSeconds: 5
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

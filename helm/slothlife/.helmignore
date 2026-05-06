@@ -1,0 +1,9 @@
+# Patterns to ignore when packaging the chart.
+# https://helm.sh/docs/chart_template_guide/helm_ignore_file/
+.git/
+.gitignore
+*.swp
+*.swo
+.idea/
+.vscode/
+.DS_Store
