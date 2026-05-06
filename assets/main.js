@@ -4429,6 +4429,15 @@ let killHold = null;          // { pointerId, startWX, startWY }
 const KILL_HOLD_S = 3.0;
 const KILL_CANCEL_DIST = 30;
 
+// Tap radii for food targets. Hoisted to module scope so the
+// pointerdown handler can use APPLE_TAP_RADIUS to check whether
+// a tap claims an apple BEFORE engaging the kill-hold gesture.
+// Apples are clearly defined targets — generous radius. Leaves
+// overlap heavily with branch tips, so a tighter radius keeps a
+// "near a leafy branch" tap from being hijacked as a leaf-eat.
+const APPLE_TAP_RADIUS = 30;
+const LEAF_TAP_RADIUS  = 14;
+
 // Helper: when a pinch gesture starts/ends we have to flush every other
 // in-flight single-finger gesture so a finger lifted at the end of a
 // pinch doesn't accidentally swing the sloth or pan the scene.
@@ -4500,10 +4509,22 @@ canvas.addEventListener('pointerdown', e=>{
   // Tap-and-hold on the sloth → start a kill-hold gesture. Pre-empts
   // the normal tap pipeline so a quick release won't fire a swing tap
   // either; the cancel handler below resets killHoldT to 0.
+  //
+  // Exception: if the tap is also claiming an apple (within
+  // APPLE_TAP_RADIUS world-space), prefer the apple-tap path. The
+  // sloth's hit area is a 36 px radius around its body centre — an
+  // apple visually behind a foot or arm sits inside that radius,
+  // and without this guard the kill-hold gesture eats the tap and
+  // a quick release clears it without falling through to the
+  // normal apple-pick pipeline. So an apple inside the sloth's
+  // silhouette stays tappable.
   if(cy < trunkBY && sloth && sloth.alive && !sloth.charred){
     const wx = canvasToWorldX(cx);
     const wy = canvasToWorldY(cy);
-    if(sloth.isHitByTap(wx, wy)){
+    const food = nearestFood(wx, wy);
+    const tapClaimsApple = food && food.kind === 'apple' &&
+                           food.dist < APPLE_TAP_RADIUS;
+    if(!tapClaimsApple && sloth.isHitByTap(wx, wy)){
       killHold = { pointerId: e.pointerId, startWX: wx, startWY: wy };
       sloth.killHoldT = 0.001;
       pendingTap = null;
@@ -4677,13 +4698,10 @@ function __runTapLogic(x, y){
   // Food check first — but only commits if the food can actually be
   // reached. If anything blocks (no candidate, out of reach, etc.) we
   // fall through to the normal branch tap so the sloth can still swing.
+  // APPLE_TAP_RADIUS / LEAF_TAP_RADIUS are hoisted to module scope so
+  // the pointerdown handler can also check apple presence before
+  // engaging the kill-hold gesture.
   const food = nearestFood(x, y);
-  // Apples are clearly defined targets — generous tap radius.
-  // Leaves overlap heavily with branch tips, so tighten their radius
-  // and only treat them as food when the tap is unmistakably on the
-  // leaf cluster, not just near a leafy branch.
-  const APPLE_TAP_RADIUS = 30;
-  const LEAF_TAP_RADIUS  = 14;
   let ate = false;
   if(food && food.kind === 'apple' && food.dist < APPLE_TAP_RADIUS){
     const f = food.fruit;
