@@ -331,43 +331,61 @@
   }
   .ov-btn:hover{background:linear-gradient(180deg,#4a7020,#2c5012)}
 
-  /* Highscore table */
+  /* Highscore table — six columns (#, SLOTH, WHEN, LASTED, SCORE,
+     LIVES) on every surface. Padding is tight so the start/end
+     overlay cards fit all six on a typical mobile portrait
+     viewport without overflow. */
   .hs-table{
-    width:100%;font-size:12px;
+    width:100%;font-size:11px;
     border-collapse:collapse;
     margin-top:6px;
+    table-layout:auto;
   }
   .hs-table th, .hs-table td{
-    padding:5px 8px;text-align:left;
+    padding:4px 5px;text-align:left;
+    white-space:nowrap;
   }
   .hs-table th{
     color:rgba(180,210,235,.65);
-    font-size:10px;letter-spacing:.12em;
+    font-size:10px;letter-spacing:.10em;
     border-bottom:1px solid rgba(255,255,255,.10);
     font-weight:normal;
   }
   .hs-table td{border-bottom:1px solid rgba(255,255,255,.04)}
-  .hs-table .rank{color:rgba(180,200,220,.65);width:24px}
+  .hs-table .rank{color:rgba(180,200,220,.65);width:18px;text-align:right}
   .hs-table .name{color:#fff}
   .hs-table .pts{text-align:right;color:#FFE678;font-weight:bold}
   .hs-table .me{background:rgba(255,210,40,.10)}
-  .hs-table .when{
+  .hs-table .when, .hs-table .lasted{
     text-align:right;
     font-size:10px;
     color:rgba(180,200,220,.55);
-    white-space:nowrap;
   }
+  .hs-table .lives{
+    text-align:right;
+    font-size:11px;
+    letter-spacing:.05em;
+    /* Apple Color Emoji renders glyphs much wider than monospace
+       digits — pin a min width so three icons never wrap. */
+    min-width:54px;
+  }
+  .hs-table .life{ display:inline-block; width:1.05em; text-align:center; }
+  .hs-table .life-blank{ color:rgba(180,200,220,.30); }
+  .hs-table .lives-empty{ color:rgba(180,200,220,.30); font-size:10px; }
   .hs-empty{
     text-align:center;color:rgba(180,200,220,.55);
     font-size:11px;padding:14px 0;
   }
-  /* Top-100 highscores modal — wider card so the WHEN column has
-     room, and a scrollable body so 100 rows don't blow up the
-     viewport. */
-  .hs-dialog .ov-card{ max-width:520px; }
+  /* Top-100 highscores modal — wider card so the six columns can
+     breathe at full size. The dialog also bumps the table back up
+     to 12px since there's room. */
+  .hs-dialog .ov-card{ max-width:560px; }
+  .hs-dialog .hs-table{ font-size:12px; }
+  .hs-dialog .hs-table th, .hs-dialog .hs-table td{ padding:5px 8px; }
   .hs-dialog-body{
     max-height:60vh;
     overflow-y:auto;
+    overflow-x:auto;
     margin:0 -4px;
     padding:0 4px;
   }

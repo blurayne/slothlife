@@ -456,6 +456,7 @@ applyPanelState();
       _endReason     = '';
       livesBonusGiven = 0;
       lives          = MAX_LIVES;
+      _livesLost     = [];
       score          = 0;
       hunger         = 0.80;
       displayedHunger = 0.80;
@@ -1257,7 +1258,7 @@ const ovHs        = document.getElementById('ov-hs');
 const ovHsClose   = document.getElementById('ov-hs-close');
 function openHighscoresDialog(){
   if(!ovHs) return;
-  renderHighscoreTable('ov-hs-table', { limit: HS_MAX_DIALOG, withTime: true });
+  renderHighscoreTable('ov-hs-table', { limit: HS_MAX_DIALOG });
   ovHs.classList.remove('hidden');
   // Trigger a fresh Convex fetch when on Vercel so the dialog
   // shows the most up-to-date 100 (the boot-time fetch may have
@@ -1782,6 +1783,12 @@ let score = 0;
 let highScore = 0;
 let lives = 3;
 const MAX_LIVES = 3;
+// Per-life death log: one push per natural life lost, in order.
+// reason ∈ {'fall' | 'lightning' | 'starve'}; month is the in-game
+// month at the moment of death (floor of gameDaysElapsed). Drives
+// the LIVES column in the highscore table — the renderer fills any
+// remaining (un-lost) slots with 🏆 (won) or ⚡ (player kill).
+let _livesLost = [];
 // Global HUD size multiplier — scales hearts, bars, icons, fonts, paddings.
 const HUD_SCALE = 1.20;
 let gameOver = false;
@@ -1889,14 +1896,18 @@ async function _refreshHighscoresFromConvex(){
   try {
     const client = await _getConvexClient();
     const rows = await client.query('highscores:list', { limit: HS_MAX });
-    highscores = rows.map((r) => ({
-      name: r.name, score: r.score, date: r.date,
-    }));
+    highscores = rows.map((r) => {
+      const e = { name: r.name, score: r.score, date: r.date };
+      if(Number.isFinite(r.survivedMonths)) e.survivedMonths = r.survivedMonths;
+      if(Array.isArray(r.livesLost))        e.livesLost      = r.livesLost;
+      if(r.endReason)                       e.endReason      = r.endReason;
+      return e;
+    });
     if(document.getElementById('ov-start-hs')) renderHighscoreTable('ov-start-hs', { limit: HS_MAX_BOARD });
     if(document.getElementById('ov-end-hs'))   renderHighscoreTable('ov-end-hs', { limit: HS_MAX_BOARD, highlightTopOf: score });
     if(document.getElementById('ov-hs-table') &&
        !document.getElementById('ov-hs').classList.contains('hidden')){
-      renderHighscoreTable('ov-hs-table', { limit: HS_MAX_DIALOG, withTime: true });
+      renderHighscoreTable('ov-hs-table', { limit: HS_MAX_DIALOG });
     }
   } catch(e){ console.warn('Convex highscores fetch failed:', e); }
 }
@@ -1926,7 +1937,7 @@ function qualifiesForLeaderboard(s){
   if(highscores.length < HS_MAX) return true;
   return s > highscores[highscores.length - 1].score;
 }
-function insertHighscore(name, s){
+function insertHighscore(name, s, extras = {}){
   // Unicode-safe sanitisation: strip control chars only (so "ä",
   // "ö", emoji, … survive), slice by code points so a multi-unit
   // char isn't split, and toLocaleUpperCase() so "ä" → "Ä". Matches
@@ -1934,20 +1945,42 @@ function insertHighscore(name, s){
   const cleaned = (name || '???').replace(/[\x00-\x1f\x7f]/g, '').trim();
   const sanitized =
     ([...cleaned].slice(0, 8).join('') || '???').toLocaleUpperCase();
+  // Sanitise the optional run-summary fields so a malformed extras
+  // object can't poison the in-memory list or the localStorage blob.
+  const survivedMonths = Number.isFinite(extras.survivedMonths)
+    ? Math.max(0, Math.floor(extras.survivedMonths)) : undefined;
+  const livesLost = Array.isArray(extras.livesLost)
+    ? extras.livesLost
+        .slice(0, MAX_LIVES)
+        .map(l => ({
+          reason: (l && (l.reason === 'fall' || l.reason === 'lightning' || l.reason === 'starve')) ? l.reason : 'fall',
+          month:  Number.isFinite(l && l.month) ? Math.max(0, Math.floor(l.month)) : 0,
+        }))
+    : undefined;
+  const endReason = (extras.endReason === 'win' || extras.endReason === 'killed' || extras.endReason === 'gameover')
+    ? extras.endReason : undefined;
+  const entry = { name: sanitized, score: s, date: Date.now() };
+  if(survivedMonths !== undefined) entry.survivedMonths = survivedMonths;
+  if(livesLost      !== undefined) entry.livesLost      = livesLost;
+  if(endReason      !== undefined) entry.endReason      = endReason;
   // Always put the new entry into the in-memory cache first so the UI
   // reflects it immediately; persistence then routes by environment.
-  highscores.push({ name: sanitized, score: s, date: Date.now() });
+  highscores.push(entry);
   highscores.sort((a, b) => b.score - a.score);
   highscores = highscores.slice(0, HS_MAX);
   if(useConvexHighscores){
     (async () => {
       try {
         const client = await _getConvexClient();
-        await client.mutation('highscores:submit', {
+        const args = {
           name:     sanitized,
           score:    s,
           clientId: _slothClientId(),
-        });
+        };
+        if(survivedMonths !== undefined) args.survivedMonths = survivedMonths;
+        if(livesLost      !== undefined) args.livesLost      = livesLost;
+        if(endReason      !== undefined) args.endReason      = endReason;
+        await client.mutation('highscores:submit', args);
         await _refreshHighscoresFromConvex();
       } catch(e){ console.warn('Convex highscores submit failed:', e); }
     })();
@@ -3015,11 +3048,21 @@ class Sloth{
     this.alive = false;
     // Player-triggered lightning kill ends the whole run. lives are
     // already 0 from charByLightning's immediate debit; just trigger
-    // the dedicated "you bastard" end-game banner.
+    // the dedicated "you bastard" end-game banner. Don't push to
+    // _livesLost — the renderer fills the still-unspent slots with
+    // ⚡ when endReason === 'killed'.
     if(this.playerKilled){
       _endGame(false, 'killed');
       return;
     }
+    // Record the cause of THIS death for the LIVES column. The
+    // STARVING state can have already transitioned to FALLING by
+    // the time _die fires (starveLetGo path), so check the starve
+    // flags before the generic "must be a fall" fallback.
+    const cause = this.charred ? 'lightning'
+                : (this.state === 'STARVING' || this.starveLetGo || this.starveDeadOnGround) ? 'starve'
+                : 'fall';
+    _livesLost.push({ reason: cause, month: Math.floor(gameDaysElapsed) });
     // Normal terminal states (slip, starve, hard ground impact) dock
     // a life here. Natural lightning strikes already debited at strike
     // time, so livesAlreadyDocked skips the second decrement.
@@ -5671,13 +5714,62 @@ function formatRelative(ts){
   return mo > 0 ? (y + 'y ' + mo + 'm ago') : (y + 'y ago');
 }
 
+// In-game duration formatter for the LASTED column. months is the
+// floor of gameDaysElapsed (one in-game month per real day-cycle):
+//   0   → '—'
+//   1-11 → '5mo'
+//   12  → '1y'
+//   16  → '1y 4mo'
+//   30  → '2y 6mo' (a full survival win)
+function formatGameDuration(months){
+  const m = Math.max(0, Math.floor(months || 0));
+  if(m <= 0)  return '—';
+  if(m < 12)  return m + 'mo';
+  const y  = Math.floor(m / 12);
+  const r  = m % 12;
+  return r > 0 ? (y + 'y ' + r + 'mo') : (y + 'y');
+}
+
+// LIVES column: three glyphs left-to-right, one per life slot.
+// Lost lives map to their cause-of-death emoji in chronological
+// order. Slots that were never lost render based on endReason:
+//   'win'      → 🏆 (full-game survival)
+//   'killed'   → ⚡ (player long-pressed the sloth dead)
+//   else        → · (placeholder for legacy rows missing data)
+const _LIFE_ICON = {
+  fall:      '🪵',  // 🪵 wood log → "broken branch"
+  lightning: '⚡',         // ⚡
+  starve:    '💀',   // 💀
+  win:       '🏆',   // 🏆
+};
+function renderLivesCell(h){
+  const lost = Array.isArray(h.livesLost) ? h.livesLost : null;
+  const end  = h.endReason;
+  // Legacy rows (pre-feature) carry no liveslost info — return em-dash.
+  if(lost === null && !end) return '<span class="lives-empty">—</span>';
+  const slots = [];
+  for(let i = 0; i < MAX_LIVES; i++){
+    if(lost && i < lost.length){
+      const r = lost[i].reason;
+      slots.push(`<span class="life life-${r}" title="${r}">${_LIFE_ICON[r] || '·'}</span>`);
+    } else if(end === 'win'){
+      slots.push(`<span class="life life-win" title="survived">${_LIFE_ICON.win}</span>`);
+    } else if(end === 'killed'){
+      slots.push(`<span class="life life-killed" title="killed by player">${_LIFE_ICON.lightning}</span>`);
+    } else {
+      slots.push('<span class="life life-blank">·</span>');
+    }
+  }
+  return slots.join('');
+}
+
 // Render the leaderboard inside an existing element id.
 // opts:
 //   highlightTopOf — score of the just-inserted row to highlight.
 //   limit          — clamp visible rows (defaults to all).
-//   withTime       — render a relative-time WHEN column (used by the
-//                    top-100 dialog; the small start/end boards keep
-//                    the compact 3-column layout).
+// Layout is identical across surfaces (start screen, end screen,
+// top-100 dialog) per CLAUDE.md / user spec — six columns, sorted
+// by score descending. CSS handles tightening on narrow overlays.
 function renderHighscoreTable(targetId, optsOrHighlight){
   // Back-compat: original signature was (targetId, highlightTopOf).
   const opts = (optsOrHighlight && typeof optsOrHighlight === 'object')
@@ -5690,17 +5782,28 @@ function renderHighscoreTable(targetId, optsOrHighlight){
     el.innerHTML = '<div class="hs-empty">No scores yet — be the first!</div>';
     return;
   }
-  const head = opts.withTime
-    ? '<tr><th>#</th><th>NAME</th><th class="pts">SCORE</th><th class="when">WHEN</th></tr>'
-    : '<tr><th>#</th><th>NAME</th><th class="pts">SCORE</th></tr>';
-  let html = '<table class="hs-table">' + head;
+  let html =
+    '<table class="hs-table">' +
+    '<tr>' +
+      '<th class="rank">#</th>' +
+      '<th>SLOTH</th>' +
+      '<th class="when">WHEN</th>' +
+      '<th class="lasted">LASTED</th>' +
+      '<th class="pts">SCORE</th>' +
+      '<th class="lives">LIVES</th>' +
+    '</tr>';
   for(let i = 0; i < rows.length; i++){
     const h = rows[i];
     const me = (opts.highlightTopOf && h.score === opts.highlightTopOf && h.name === lastInsertedName) ? ' me' : '';
-    const when = opts.withTime
-      ? `<td class="when">${escapeHtml(formatRelative(h.date))}</td>`
-      : '';
-    html += `<tr class="${me}"><td class="rank">${i+1}</td><td class="name">${escapeHtml(h.name)}</td><td class="pts">${h.score}</td>${when}</tr>`;
+    html +=
+      `<tr class="${me}">` +
+        `<td class="rank">${i+1}</td>` +
+        `<td class="name">${escapeHtml(h.name)}</td>` +
+        `<td class="when">${escapeHtml(formatRelative(h.date))}</td>` +
+        `<td class="lasted">${escapeHtml(formatGameDuration(h.survivedMonths))}</td>` +
+        `<td class="pts">${h.score}</td>` +
+        `<td class="lives">${renderLivesCell(h)}</td>` +
+      '</tr>';
   }
   html += '</table>';
   el.innerHTML = html;
@@ -5767,12 +5870,14 @@ function beginPlaying(){
   ovEnd.classList.add('hidden');
   // Fresh game state
   lives = MAX_LIVES;
+  _livesLost = [];
   score = 0;
   hunger = 0.80;
   displayedHunger = 0.80;
   _sleepLabelAlpha = 0;
   gameOver = false;
   didWin = false;
+  _endReason = '';
   livesBonusGiven = 0;
   gameDaysElapsed = 0;
   _lastYearMark = 0;
@@ -5797,7 +5902,14 @@ document.getElementById('ov-name-btn').addEventListener('click', () => {
   const cleaned = (inp.value || '').replace(/[\x00-\x1f\x7f]/g, '').trim();
   const name =
     ([...cleaned].slice(0, 8).join('') || 'ANON').toLocaleUpperCase();
-  insertHighscore(name, score);
+  // endReason maps the run's exit path: 'win' for full survival,
+  // 'killed' for player-triggered lightning, otherwise 'gameover'.
+  const endReason = didWin ? 'win' : (_endReason === 'killed' ? 'killed' : 'gameover');
+  insertHighscore(name, score, {
+    survivedMonths: Math.floor(gameDaysElapsed),
+    livesLost:      _livesLost,
+    endReason,
+  });
   lastInsertedName = name;
   showEndScreen();
 });
@@ -5815,6 +5927,7 @@ function _checkPostGameTransition(){
 
 function restartGame(){
   lives = MAX_LIVES;
+  _livesLost = [];
   score = 0;
   hunger = 0.80;
   displayedHunger = 0.80;

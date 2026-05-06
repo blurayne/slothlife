@@ -15,6 +15,23 @@ export default defineSchema({
     name:  v.string(),
     score: v.number(),
     date:  v.number(),
+    // Optional run-summary fields. All three were added after the
+    // initial leaderboard launch — old rows lack them, so v.optional
+    // is required for read-side validation to keep accepting them.
+    survivedMonths: v.optional(v.number()),
+    livesLost: v.optional(v.array(v.object({
+      reason: v.union(
+        v.literal("fall"),
+        v.literal("lightning"),
+        v.literal("starve"),
+      ),
+      month: v.number(),
+    }))),
+    endReason: v.optional(v.union(
+      v.literal("win"),
+      v.literal("gameover"),
+      v.literal("killed"),
+    )),
   }).index("by_score", ["score"]),
 
   submissions: defineTable({

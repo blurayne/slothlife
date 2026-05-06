@@ -36,9 +36,12 @@ export const list = query({
       .order("desc")
       .take(limit);
     return rows.map((r) => ({
-      name:  r.name,
-      score: r.score,
-      date:  r.date,
+      name:           r.name,
+      score:          r.score,
+      date:           r.date,
+      survivedMonths: r.survivedMonths,
+      livesLost:      r.livesLost,
+      endReason:      r.endReason,
     }));
   },
 });
@@ -57,11 +60,37 @@ export const list = query({
 //   * Successful submits append to a `submissions` ledger; older
 //     rows past SUBMISSIONS_KEEP for that clientId are pruned in
 //     the same mutation so the table stays small.
+// MAX_LIVES on the client is 3; cap the array length defensively so
+// a tampered submit can't store an oversized array. Keep the cap a
+// touch above 3 in case the rules ever grow (e.g. bonus lives).
+const LIVES_LOST_CAP = 8;
+// Hard ceiling for survivedMonths — the default game ends at 30
+// in-game months. Allow a generous multiple (custom dev runs can go
+// further) but reject anything astronomically wrong.
+const MONTHS_CAP = 10_000;
+
 export const submit = mutation({
   args: {
     name:     v.string(),
     score:    v.number(),
     clientId: v.optional(v.string()),
+    // Optional run-summary fields. Sanitised below; missing / bogus
+    // values are silently dropped rather than rejected so a stale
+    // client never loses an otherwise-valid submit.
+    survivedMonths: v.optional(v.number()),
+    livesLost: v.optional(v.array(v.object({
+      reason: v.union(
+        v.literal("fall"),
+        v.literal("lightning"),
+        v.literal("starve"),
+      ),
+      month: v.number(),
+    }))),
+    endReason: v.optional(v.union(
+      v.literal("win"),
+      v.literal("gameover"),
+      v.literal("killed"),
+    )),
   },
   handler: async (ctx, args) => {
     const cleaned = (args.name ?? "").replace(CTRL_RE, "").trim();
@@ -102,10 +131,34 @@ export const submit = mutation({
       }
     }
 
+    // Sanitise the optional summary fields. All three are stored
+    // only when they pass validation; otherwise the row is inserted
+    // without them so a buggy client can't poison the table.
+    const survivedMonths =
+      typeof args.survivedMonths === "number" &&
+      Number.isFinite(args.survivedMonths) &&
+      args.survivedMonths >= 0 &&
+      args.survivedMonths <= MONTHS_CAP
+        ? Math.floor(args.survivedMonths)
+        : undefined;
+    const livesLost = Array.isArray(args.livesLost)
+      ? args.livesLost.slice(0, LIVES_LOST_CAP).map((l) => ({
+          reason: l.reason,
+          month:
+            Number.isFinite(l.month) && l.month >= 0 && l.month <= MONTHS_CAP
+              ? Math.floor(l.month)
+              : 0,
+        }))
+      : undefined;
+    const endReason = args.endReason;
+
     const id = await ctx.db.insert("highscores", {
       name,
       score,
       date: Date.now(),
+      ...(survivedMonths !== undefined ? { survivedMonths } : {}),
+      ...(livesLost      !== undefined ? { livesLost }      : {}),
+      ...(endReason      !== undefined ? { endReason }      : {}),
     });
     // Trim: keep only the top HS_MAX entries.
     const rows = await ctx.db
