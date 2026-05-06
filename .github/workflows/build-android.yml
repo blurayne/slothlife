@@ -189,31 +189,33 @@ jobs:
             -storepass "${BUBBLEWRAP_KEYSTORE_PASSWORD}" \
             | grep -E '^\s*SHA256:' || true
 
-      # bubblewrap init walks a 5-stage Q&A wizard ("Web app details",
-      # "Application details", colors, icons, signing key) even when
-      # given --manifest=URL — the URL only seeds DEFAULTS, every
-      # prompt still fires asking the user to confirm or override.
-      # There's no --non-interactive / --accept-defaults flag (per
-      # init.ts source on main), so we feed empty lines via stdin to
-      # accept every default. PTY-wrap with script(1) because
-      # inquirer reads /dev/tty, not process.stdin.
+      # Generate the TWA project from the repo's checked-in
+      # twa-manifest.json. We deliberately use `update`, not `init`:
       #
-      # `yes ""` outputs "\n" forever — every inquirer prompt sees an
-      # empty answer and falls through to its default value (which
-      # is sourced from the manifest URL we already control).
+      # * `init --manifest=URL` walks a 5-stage Q&A wizard (domain,
+      #   app name, colors, icons, signing key) even when --manifest
+      #   pre-fills every default — there's no --non-interactive
+      #   flag, just empty-line piping through a PTY. Brittle.
       #
-      # No `|| true` here: any genuine init failure must surface.
-      # The trailing `ls -la` confirms manifest-checksum.json (which
-      # bubblewrap build's hasManifestChanged() reads) actually landed.
+      # * `update` reads twa-manifest.json from disk and calls
+      #   generateTwaProject + generateManifestChecksumFile directly.
+      #   Verified from packages/cli/src/lib/cmds/shared.ts on main:
+      #     - generateTwaProject has ZERO inquirer prompts.
+      #     - updateProject has ONE prompt (promptNewAppVersionName)
+      #       gated on `skipVersionUpgrade`.
+      #   Pass --skipVersionUpgrade and update runs fully non-
+      #   interactively, regenerates the Gradle scaffolding from
+      #   twa-manifest.json (the repo has one with packageId,
+      #   signingKey, etc.), and writes the checksum file that
+      #   `bubblewrap build`'s hasManifestChanged() reads.
+      #
+      # The trailing `ls -la` confirms the checksum landed.
       - name: Generate TWA project
         timeout-minutes: 10
         run: |
           set -euo pipefail
           bubblewrap --version
-          yes "" | script -qec "bubblewrap init \
-            --directory=. \
-            --manifest=https://blurayne.github.io/slothlife/manifest.json \
-            --skipPwaValidation" /dev/null
+          bubblewrap update --skipVersionUpgrade
           ls -la manifest-checksum.json twa-manifest.json
 
       # Bubblewrap's build can still raise prompts beyond the wizard:
