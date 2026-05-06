@@ -4,6 +4,10 @@ Each entry below links to a detailed plan in
 [`.claude/plans/`](.claude/plans/). Tick the box once the task ships.
 Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
+Brain-dump-grade future ideas (not yet planned) live in
+[`IDEAS.md`](IDEAS.md). Promote an idea here with a plan link
+once it's ready to ship.
+
 ## Open
 
 _(none — see "Shipped this batch" below.)_
