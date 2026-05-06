@@ -603,10 +603,11 @@ const Audio = {
   // independently of sound effects. Game starts on a random track and
   // the user can advance to the next track from the settings panel.
   _musicTracks: [
-    { name: 'Mossy Perch',    url: 'assets/audio/mossy-perch.mp3'    },
-    { name: 'Selva Lenta',    url: 'assets/audio/selva-lenta.mp3'    },
-    { name: 'Canopy Drift',   url: 'assets/audio/canopy-drift.mp3'   },
-    { name: 'Selva Lenta II', url: 'assets/audio/selva-lenta-ii.mp3' },
+    { name: 'Mossy Perch',          url: 'assets/audio/mossy-perch.mp3'           },
+    { name: 'Super Sloth Bros Chill', url: 'assets/audio/super-sloth-bros-chill.mp3' },
+    { name: 'Selva Lenta',          url: 'assets/audio/selva-lenta.mp3'           },
+    { name: 'Canopy Drift',         url: 'assets/audio/canopy-drift.mp3'          },
+    { name: 'Selva Lenta II',       url: 'assets/audio/selva-lenta-ii.mp3'        },
   ],
   _musicIndex: 0,                            // start always with Mossy Perch (track 0)
   _musicBuffers: Object.create(null),        // url → AudioBuffer cache

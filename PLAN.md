@@ -11,6 +11,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped this batch
 
+- [x] **Add "Super Sloth Bros Chill" as the second background music track**
 - [x] Unicode-safe highscore names (faulbär → FAULBÄR) — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
 - [x] Settings panel: gate dev controls behind a 2.5s long-press on the gear — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
 - [x] Highscores: top-100 dialog with relative timestamps; start/end show top 10 — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
