@@ -189,23 +189,31 @@ jobs:
             -storepass "${BUBBLEWRAP_KEYSTORE_PASSWORD}" \
             | grep -E '^\s*SHA256:' || true
 
-      # bubblewrap init reads twa-manifest.json from the repo and
-      # generates the Gradle scaffolding INCLUDING manifest-checksum.json,
-      # which `bubblewrap build` later reads to verify the project is
-      # in sync. If init fails silently the checksum is missing and
-      # build prompts "would you like to regenerate your project?"
-      # — which used to hang the runner. So no `|| true` here: any
-      # init failure has to surface. The trailing `ls -la` confirms
-      # the checksum file actually landed.
+      # bubblewrap init walks a 5-stage Q&A wizard ("Web app details",
+      # "Application details", colors, icons, signing key) even when
+      # given --manifest=URL — the URL only seeds DEFAULTS, every
+      # prompt still fires asking the user to confirm or override.
+      # There's no --non-interactive / --accept-defaults flag (per
+      # init.ts source on main), so we feed empty lines via stdin to
+      # accept every default. PTY-wrap with script(1) because
+      # inquirer reads /dev/tty, not process.stdin.
+      #
+      # `yes ""` outputs "\n" forever — every inquirer prompt sees an
+      # empty answer and falls through to its default value (which
+      # is sourced from the manifest URL we already control).
+      #
+      # No `|| true` here: any genuine init failure must surface.
+      # The trailing `ls -la` confirms manifest-checksum.json (which
+      # bubblewrap build's hasManifestChanged() reads) actually landed.
       - name: Generate TWA project
         timeout-minutes: 10
         run: |
           set -euo pipefail
           bubblewrap --version
-          bubblewrap init \
+          yes "" | script -qec "bubblewrap init \
             --directory=. \
             --manifest=https://blurayne.github.io/slothlife/manifest.json \
-            --skipPwaValidation
+            --skipPwaValidation" /dev/null
           ls -la manifest-checksum.json twa-manifest.json
 
       # Bubblewrap's build can still raise prompts beyond the wizard:
