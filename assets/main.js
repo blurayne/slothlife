@@ -3405,9 +3405,13 @@ _eat(dt){
     const reachMul = (limb.state === 'REACHING') ? P.armReach : 1.0;
     const ik = solve2IK(sx, sy, tx, ty, upper * reachMul, lower * reachMul, limb.side);
     const w = limb.isArm ? 4.5 : 5.0;
-    // SUN SHADE — only arms get the directional tint (legs stay flat
-    // per the user-facing scope of the toggle).
-    const col = limb.isArm ? this._shaded(0x73, 0x5A, 0x38) : '#7A6342';
+    // SUN SHADE — every limb (arms AND legs/feet) gets the directional
+    // tint so the whole sloth shades as one. Earlier the legs were
+    // hard-coded to #7A6342, which made the back feet look unshaded
+    // next to a shaded body + arms.
+    const col = limb.isArm
+      ? this._shaded(0x73, 0x5A, 0x38)
+      : this._shaded(0x7A, 0x63, 0x42);
     this._seg(sx, sy, ik.e, ik.h, w, col);
     if(limb.gripped){
       const tan = getBranchTangent(limb.branch, limb.t);
