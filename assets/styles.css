@@ -298,17 +298,6 @@
     font-size:12px;line-height:1.45;
     color:#FFE678;letter-spacing:.04em;
   }
-  /* Subtler styling for the dev-mode hint — same shape, muted
-     palette so it reads as a secondary tip rather than a primary
-     gameplay TIP. */
-  .ov-tip-dev{
-    margin-top:6px;
-    background:rgba(160,200,255,0.05);
-    border-left-color:rgba(160,200,255,.55);
-    color:rgba(200,220,245,.78);
-    font-size:11px;
-  }
-
   /* Toast — short message in the centre-top of the screen, fades
      out. Used to announce dev-mode toggles. */
   #devmode-toast{
