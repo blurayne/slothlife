@@ -1929,7 +1929,7 @@ const MAX_LIVES = 3;
 // reason ∈ {'fall' | 'lightning' | 'starve'}; month is the in-game
 // month at the moment of death (floor of gameDaysElapsed). Drives
 // the LIVES column in the highscore table — the renderer fills any
-// remaining (un-lost) slots with 🏆 (won) or ⚡ (player kill).
+// remaining (un-lost) slots with ❤️ (won) or ⚡ (player kill).
 let _livesLost = [];
 // Global HUD size multiplier — scales hearts, bars, icons, fonts, paddings.
 const HUD_SCALE = 1.20;
@@ -5869,7 +5869,7 @@ function formatRelative(ts){
   return mo > 0 ? (y + 'y ' + mo + 'm ago') : (y + 'y ago');
 }
 
-// In-game duration formatter for the LASTED column. months is the
+// In-game duration formatter for the SURVIVED column. months is the
 // floor of gameDaysElapsed (one in-game month per real day-cycle):
 //   0   → '—'
 //   1-11 → '5mo'
@@ -5888,14 +5888,14 @@ function formatGameDuration(months){
 // LIVES column: three glyphs left-to-right, one per life slot.
 // Lost lives map to their cause-of-death emoji in chronological
 // order. Slots that were never lost render based on endReason:
-//   'win'      → 🏆 (full-game survival)
+//   'win'      → ❤️ (full-game survival, life still beating)
 //   'killed'   → ⚡ (player long-pressed the sloth dead)
 //   else        → · (placeholder for legacy rows missing data)
 const _LIFE_ICON = {
   fall:      '🪵',  // 🪵 wood log → "broken branch"
   lightning: '⚡',         // ⚡
   starve:    '💀',   // 💀
-  win:       '🏆',   // 🏆
+  win:       '❤️',   // ❤️
 };
 function renderLivesCell(h){
   const lost = Array.isArray(h.livesLost) ? h.livesLost : null;
@@ -5943,7 +5943,7 @@ function renderHighscoreTable(targetId, optsOrHighlight){
       '<th class="rank">#</th>' +
       '<th>SLOTH</th>' +
       '<th class="when">WHEN</th>' +
-      '<th class="lasted">LASTED</th>' +
+      '<th class="lasted">SURVIVED</th>' +
       '<th class="lives">LIVES</th>' +
       '<th class="pts">SCORE</th>' +
     '</tr>';
@@ -5970,7 +5970,7 @@ function renderHighscoreTable(targetId, optsOrHighlight){
       '<span class="lk">⚡ struck</span>' +
       '<span class="lk">🪵 fell</span>' +
       '<span class="lk">💀 starved</span>' +
-      '<span class="lk">🏆 won</span>' +
+      '<span class="lk">❤️ won</span>' +
     '</div>';
   el.innerHTML = html;
 }
