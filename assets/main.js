@@ -466,6 +466,14 @@ let sunShadeMode = true;
 // the far left, +1 = sun on the far right, 0 = sun directly overhead
 // (or SUN SHADE off / raining / sun below the horizon).
 let _sunBias = 0;
+// Smoothed 0..1 multiplier on every sun-shade pass. Ramps over
+// SUN_SHADE_FADE_S real seconds toward 1 (toggle on, not raining)
+// or 0 (toggle off / heavy rain) so flipping either condition
+// fades the shade in/out instead of snapping. Natural sunrise /
+// sunset is already smooth via sun.opacity and isn't time-capped
+// by this — it only multiplies through.
+let _sunShadeFade = 0;
+const SUN_SHADE_FADE_S = 0.7;
 // Default OFF — players reported the cast shadow felt heavy at noon.
 let sunShadowMode = false;
 let weightMode = true;
@@ -5724,11 +5732,11 @@ function restartGame(){
 // SUN SHADE — directional warm-light / cool-shadow gradient driven by
 // the sun's screen position. Applied with `soft-light` so it gently
 // brightens the side facing the sun and darkens the opposite side
-// without crushing colours. Skipped when raining (no shafts of light
-// through clouds) or when the SUN SHADE toggle is off.
+// without crushing colours. Faded out via _sunShadeFade when raining
+// (no shafts of light through clouds) or when the SUN SHADE toggle is
+// off; natural sunset still drives strength via sun.opacity.
 function drawSunShade(){
-  if(!sunShadeMode) return;
-  if(rainIntensity > 0.05) return;
+  if(_sunShadeFade <= 0.001) return;
   const sun = getSunPos(dayTime);
   if(sun.opacity <= 0) return;
   // The sun disc is drawn inside applyCameraTransform (via
@@ -5742,7 +5750,7 @@ function drawSunShade(){
   // Strength scales with sun.opacity (sunset fade) and the
   // dev-mode SHADE STRENGTH slider. Capped so the soft-light
   // blend can't punch pure black/white at high values.
-  const strength = Math.min(0.95, sun.opacity * 0.40 * P.shadeStrength);
+  const strength = Math.min(0.95, sun.opacity * _sunShadeFade * 0.40 * P.shadeStrength);
 
   // Radial gradient anchored at the visual sun position. Bright
   // warm at the centre, mid-neutral at half-radius, cool dark at
@@ -5765,18 +5773,18 @@ function drawSunShade(){
 // SUN SHADOW — darkens the grass on the side opposite the sun, like a
 // directional cast shadow from the canopy. Weaker at noon (sun overhead
 // → short shadow) and strongest near sunrise/sunset (long raking
-// shadow). Skipped when raining, when SUN SHADE is off, or when the
-// SHADOW sub-toggle is off.
+// shadow). Faded out via _sunShadeFade when raining or when SUN SHADE
+// is off; the SHADOW sub-toggle still snaps on/off independently.
 function drawSunShadow(){
-  if(!sunShadeMode || !sunShadowMode) return;
-  if(rainIntensity > 0.05) return;
+  if(!sunShadowMode) return;
+  if(_sunShadeFade <= 0.001) return;
   const sun = getSunPos(dayTime);
   if(sun.opacity <= 0) return;
   const sunNx = (sun.x - W * 0.5) / (W * 0.5);     // -1..+1
   const heightFactor = 1 - Math.min(1, Math.abs(sunNx));
   // Lower sun (heightFactor near 0) → longer/darker shadow; high sun
   // → barely any shadow. Cap so it never blows out.
-  const strength = sun.opacity * (0.45 - 0.30 * heightFactor);
+  const strength = sun.opacity * _sunShadeFade * (0.45 - 0.30 * heightFactor);
   if(strength <= 0.02) return;
 
   // Shadow lives on the lower portion (canopy bottom + grass).
@@ -6377,12 +6385,23 @@ function frame(ts){
   // Recompute the sun-side bias once per frame so the trunk + branch
   // shading downstream all read the same value. 0 = no shading
   // (toggle off, raining, or sun below the horizon).
+  // _sunShadeFade ramps linearly toward 1 (toggle on, no rain) or 0
+  // (toggle off / raining) over SUN_SHADE_FADE_S real seconds, so the
+  // shade fades in/out instead of snapping. Multiplied into _sunBias
+  // and (further down) into drawSunShade/drawSunShadow strengths.
+  {
+    const target = (sunShadeMode && rainIntensity < 0.05) ? 1 : 0;
+    const step = dt / SUN_SHADE_FADE_S;
+    if(_sunShadeFade < target)      _sunShadeFade = Math.min(target, _sunShadeFade + step);
+    else if(_sunShadeFade > target) _sunShadeFade = Math.max(target, _sunShadeFade - step);
+  }
   _sunBias = 0;
-  if(sunShadeMode && rainIntensity < 0.05){
+  if(_sunShadeFade > 0){
     const sun = getSunPos(dayTime);
     if(sun.opacity > 0){
-      _sunBias = ((sun.x - W * 0.5) / (W * 0.5)) * sun.opacity;
-      _sunBias = Math.max(-1, Math.min(1, _sunBias));
+      let raw = ((sun.x - W * 0.5) / (W * 0.5)) * sun.opacity;
+      raw = Math.max(-1, Math.min(1, raw));
+      _sunBias = raw * _sunShadeFade;
     }
   }
   Audio.updateWind(Wind.str);

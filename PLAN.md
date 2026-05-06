@@ -11,6 +11,7 @@ Convention is documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Shipped this batch
 
+- [x] **Sun shade fades in/out over 0.7s on toggle/rain transitions** (natural sunset still drives strength via sun.opacity)
 - [x] **Sun shade extends to sloth body, head, and arms** (legs unaffected)
 - [x] **Add "Super Sloth Bros Chill" as the second background music track**
 - [x] Unicode-safe highscore names (faulbär → FAULBÄR) — [plan](.claude/plans/settings-devmode-and-highscores-top100.md)
