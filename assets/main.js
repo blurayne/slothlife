@@ -5840,6 +5840,17 @@ function renderHighscoreTable(targetId, optsOrHighlight){
       '</tr>';
   }
   html += '</table>';
+  // LIVES-column legend. Same icons as _LIFE_ICON above, paired with
+  // a one-word cause-of-death so a first-time reader can decode the
+  // column without context. .lk wraps each pair in nowrap so the
+  // glyph + label never wrap apart on narrow phones.
+  html +=
+    '<div class="hs-legend">' +
+      '<span class="lk">⚡ struck</span>' +
+      '<span class="lk">🪵 fell</span>' +
+      '<span class="lk">💀 starved</span>' +
+      '<span class="lk">🏆 won</span>' +
+    '</div>';
   el.innerHTML = html;
 }
 function escapeHtml(s){
