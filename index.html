@@ -174,11 +174,6 @@
   <!-- Env + version row — dev mode only; in player mode the same
        string appears as the first segment of the bottom footer. -->
   <div class="pversion js-version-top dev-only"></div>
-  <!-- RELOAD is a dev-only debugging shortcut (clears the SW cache
-       + reloads). Hidden behind dev-mode so a normal player isn't
-       tempted to nuke their session by accident. -->
-  <div class="prow dev-only"><span class="pname"></span>
-    <button id="b-refresh" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RELOAD</button></div>
 
   <!-- Player-mode rows (always visible). The .dev-only sections
        below are hidden whenever #panel.locked. -->
@@ -195,7 +190,7 @@
     <div class="tog" id="t-tleft"></div><span class="tlbl" id="l-tleft">OFF</span></div>
   <div class="prow"><span class="pname">BACKGROUND</span>
     <span class="pval" id="v-bg" style="text-align:left;flex:1;">PLAINS</span></div>
-  <div class="prow"><span class="pname">RANDOMIZE</span>
+  <div class="prow"><span class="pname"></span>
     <button id="b-randomize" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">NEXT</button></div>
   <div class="prow"><span class="pname">MUSIC VOL</span>
     <input type="range" id="s-musicVol" min="0" max="1" step="0.01" value="0.75">
@@ -305,14 +300,19 @@
        dev mode), so the player view never shows it. -->
   <div class="prow" style="margin-top:14px"><span class="pname"></span>
     <button id="b-lock-dev" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">EXIT DEV MODE</button></div>
+  <!-- RESTART is the dev-only re-roll: forces a fresh tree + scene.
+       Hidden from player mode so a casual visitor doesn't nuke
+       their run by accident. -->
+  <div class="prow"><span class="pname"></span>
+    <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RESTART</button></div>
   </div><!-- /.dev-only -->
 
-  <!-- RESTART always visible; bottom of the panel so the
-       destructive action sits at the end of the scroll. Extra
-       top margin separates it from the last content row above
-       (varies between PLAYER and dev modes). -->
+  <!-- Bottom-of-panel always-visible action: hard reset (clears
+       the SW cache + reloads the page). Same handler as the old
+       dev-only RELOAD button — just relabeled and promoted to the
+       player-facing slot. -->
   <div class="prow" style="margin-top:18px"><span class="pname"></span>
-    <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RESTART</button></div>
+    <button id="b-refresh" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RESET</button></div>
 
   <!-- Player footer: same two-line stamp as the dev-mode top
        row (env · version · build / date · SHA). Dev mode hides
