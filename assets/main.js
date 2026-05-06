@@ -1375,19 +1375,30 @@ const Wind = {
   t:0, mag:0.7, targetMag:0.9, timer:0, period:2.0,
   tick(dt){
     this.t+=dt; this.timer+=dt;
+    // Rain amplifies the wind: rainIntensity 0..1 maps to 1×..1.8×
+    // on both the new-gust ceiling and the sustained decay floor,
+    // so a heavy storm reads as wind-driven (tree visibly thrashes,
+    // gust audio fires more often) without a separate weather
+    // system. Dry weather (rainIntensity=0) keeps the prior
+    // behaviour exactly.
+    const rainBoost = 1 + rainIntensity * 0.8;
     if(this.timer>=this.period){
       this.timer=0; this.period=0.8+Math.random()*4.0;
-      const newTarget=(0.35+Math.random()*1.55)*P.windForce;
+      const newTarget=(0.35+Math.random()*1.55)*P.windForce*rainBoost;
       // Sudden upward jump → audible turbulence "whoosh"
       const jump = newTarget - this.targetMag;
       if(jump > 0.30) Audio.playGust(jump);
       this.targetMag = newTarget;
     }
     this.mag      += (this.targetMag-this.mag)*Math.min(dt*2.6,1);
-    this.targetMag = Math.max(0.28*P.windForce, this.targetMag-dt*0.22);
+    this.targetMag = Math.max(0.28*P.windForce*rainBoost, this.targetMag-dt*0.22);
   },
   sample(m=1){
-    const sp=P.windSpeed, tb=P.turbulence;
+    // Rain also bumps the high-frequency turbulence band so the
+    // canopy chatters more violently in a storm — distinct from
+    // the rainBoost on this.mag (which is broadband). At
+    // rainIntensity=1 the trb component goes from 0.85 → 1.35.
+    const sp=P.windSpeed, tb=P.turbulence + rainIntensity*0.5;
     const sweep=fBm(this.t*0.09*sp,3);
     const gust =fBm(this.t*0.60*sp+44,3)*0.48;
     const trb  =fBm(this.t*2.40*sp+88,2)*0.18*tb*2;
