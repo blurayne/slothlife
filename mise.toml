@@ -1,0 +1,132 @@
+# mise (mise.jdx.dev) tasks for slothlife. Two surfaces:
+#
+#   1. Serve the static app — locally for dev, or via the
+#      Containerfile + docker-compose.yml for a production-like
+#      run.
+#   2. Build the Android TWA from twa-manifest.json (mirrors
+#      .github/workflows/build-android.yml so a local build
+#      produces the same APK/AAB the CI workflow does).
+#
+# Discover tasks:  mise tasks
+# Run a task:      mise run <name>
+
+[tools]
+node = "20"
+java = "temurin-17"
+
+[env]
+# Throwaway debug-keystore passwords. Same string as the CI
+# workflow's keystore step. Replace both for production.
+BUBBLEWRAP_KEYSTORE_PASSWORD = "android"
+BUBBLEWRAP_KEY_PASSWORD = "android"
+
+# ── Serving ──────────────────────────────────────────────
+
+[tasks.serve]
+description = "Serve the static app on http://localhost:8000 via python http.server. Audio loading needs HTTP, not file://."
+run = "python3 -m http.server 8000"
+
+[tasks."serve:docker"]
+description = "Build + run the Containerfile via docker-compose on http://localhost:8080."
+run = "docker compose up --build"
+
+[tasks."serve:docker:stop"]
+description = "Stop + remove the docker-compose stack."
+run = "docker compose down"
+
+# ── TWA build ────────────────────────────────────────────
+
+[tasks."twa:icons"]
+description = "Render PNG icons (192/512/maskable-512) from assets/favicon.svg into icons/."
+run = """
+set -euo pipefail
+command -v rsvg-convert >/dev/null || { echo 'Need librsvg2-bin (rsvg-convert)'; exit 1; }
+command -v magick       >/dev/null || command -v convert >/dev/null || { echo 'Need imagemagick (magick / convert)'; exit 1; }
+mkdir -p icons
+rsvg-convert -w 192 -h 192 assets/favicon.svg -o icons/icon-192.png
+rsvg-convert -w 512 -h 512 assets/favicon.svg -o icons/icon-512.png
+rsvg-convert -w 410 -h 410 assets/favicon.svg -o icons/_inner.png
+if command -v magick >/dev/null; then
+  magick -size 512x512 xc:'#7A4A28' \\( icons/_inner.png \\) -gravity center -composite icons/icon-mask-512.png
+else
+  convert -size 512x512 xc:'#7A4A28' \\( icons/_inner.png \\) -gravity center -composite icons/icon-mask-512.png
+fi
+rm icons/_inner.png
+ls -la icons/
+"""
+
+[tasks."twa:keystore"]
+description = "Generate a debug Android keystore at android.keystore. Idempotent; refuses to clobber an existing keystore."
+run = """
+set -euo pipefail
+if [ -f android.keystore ]; then
+  echo 'android.keystore already exists; skipping.'
+  exit 0
+fi
+keytool -genkeypair -noprompt \\
+  -alias android \\
+  -keypass  "$BUBBLEWRAP_KEY_PASSWORD" \\
+  -storepass "$BUBBLEWRAP_KEYSTORE_PASSWORD" \\
+  -keystore android.keystore \\
+  -dname 'CN=Sloth, O=Slothlife, C=US' \\
+  -keyalg RSA -keysize 2048 -validity 10000
+echo 'Wrote android.keystore (debug-only).'
+"""
+
+[tasks."twa:sha256"]
+description = "Print the signing-key SHA-256 fingerprint (paste into /.well-known/assetlinks.json on the apex domain)."
+run = """
+keytool -list -v \\
+  -keystore android.keystore \\
+  -alias android \\
+  -storepass "$BUBBLEWRAP_KEYSTORE_PASSWORD" \\
+  | grep -E '^[[:space:]]*SHA256:'
+"""
+
+[tasks."twa:build"]
+description = "Generate + build the Android TWA (depends on twa:icons + twa:keystore). Produces app-release-signed.apk and app-release-bundle.aab at the repo root."
+depends = ["twa:icons", "twa:keystore"]
+run = """
+set -euo pipefail
+# Use the local devDependency (or fetch via npx if missing).
+npm install --no-audit --no-fund
+
+# Bubblewrap fetches iconUrl + maskableIconUrl from twa-manifest.json.
+# Those URLs point at the deployed Pages site; on a fresh local
+# build we may not have shipped yet, so spin up a tiny HTTP
+# server in the icon-render output dir and rewrite the URLs to
+# localhost just for the update step. Identical bytes either way
+# (we render from the same SVG that Pages does).
+python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/slothlife-icon-srv.log 2>&1 &
+SRV=$!
+trap 'kill $SRV 2>/dev/null || true' EXIT
+sleep 1
+curl -fsS -o /dev/null http://127.0.0.1:8765/icons/icon-512.png
+curl -fsS -o /dev/null http://127.0.0.1:8765/icons/icon-mask-512.png
+
+cp twa-manifest.json twa-manifest.json.orig
+sed -i.bak \\
+  's|"https://blurayne.github.io/slothlife/icons/|"http://127.0.0.1:8765/icons/|g' \\
+  twa-manifest.json
+rm -f twa-manifest.json.bak
+
+npx --no-install bubblewrap update --skipVersionUpgrade
+
+mv twa-manifest.json.orig twa-manifest.json
+
+# bubblewrap build is interactive even when configured (asks
+# about manifest checksums, etc). yes y + script(1) auto-confirms
+# every prompt and gives inquirer a real PTY to read from.
+yes y | script -qec "npx --no-install bubblewrap build --skipPwaValidation" /dev/null
+
+ls -la *.apk *.aab 2>/dev/null || true
+"""
+
+[tasks."twa:clean"]
+description = "Remove all Bubblewrap build outputs (icons/, app/, build/, gradle/, *.apk, *.aab, keystore, checksum)."
+run = """
+rm -rf icons app build gradle .gradle gradlew gradlew.bat
+rm -f build.gradle settings.gradle store_icon.png
+rm -f *.apk *.aab manifest-checksum.json android.keystore
+echo 'Cleaned TWA build outputs.'
+"""
