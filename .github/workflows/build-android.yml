@@ -88,26 +88,11 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm i -g --no-audit --no-fund @bubblewrap/cli@latest
 
-      # First-run gate: without a pre-written config, bubblewrap drops
-      # into an interactive wizard ("Do you want Bubblewrap to install
-      # the JDK (recommended)? (Y/n)") on the first command, which on
-      # a TTY-less GHA runner hangs until SIGINT (exit code 130).
-      # CI=true does NOT skip that wizard. Pre-populate the config so
-      # bubblewrap finds an existing JDK + Android SDK and never
-      # prompts. JAVA_HOME is set by setup-java; ANDROID_HOME ships
-      # pre-installed on ubuntu-latest at /usr/local/lib/android/sdk.
-      - name: Configure Bubblewrap (pin JDK + Android SDK paths)
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.bubblewrap"
-          cat > "$HOME/.bubblewrap/config.json" <<EOF
-          {
-            "jdkPath": "${JAVA_HOME}",
-            "androidSdkPath": "${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          }
-          EOF
-          echo "--- ~/.bubblewrap/config.json ---"
-          cat "$HOME/.bubblewrap/config.json"
+      # Log the Bubblewrap version up-front so any future first-run
+      # surprise (the wizard schema has changed between releases) is
+      # easy to diagnose from the workflow log.
+      - name: Bubblewrap version
+        run: bubblewrap --version
 
       # Throwaway debug keystore so the build completes end-to-end
       # without operator interaction. SHA-256 fingerprint is printed
@@ -138,35 +123,52 @@ jobs:
             -storepass "${BUBBLEWRAP_KEYSTORE_PASSWORD}" \
             | grep -E '^\s*SHA256:' || true
 
-      # bubblewrap init reads twa-manifest.json from the working
-      # directory if present (avoids the interactive prompts), then
-      # generates the Gradle scaffolding. --skipPwaValidation lets
-      # this run before manifest.json + icons are live on Pages.
+      # First-run wizard handling:
       #
-      # `exec </dev/null` closes stdin for every subsequent command in
-      # this script. If any bubblewrap subcommand still tries to
-      # prompt despite the pre-written config, it gets EOF and fails
-      # fast instead of hanging the runner. The step-level
-      # timeout-minutes is the last line of defence.
+      # Bubblewrap's first command on a fresh HOME walks the user
+      # through a four-prompt setup wizard:
+      #
+      #   1. "Do you want Bubblewrap to install the JDK (recommended)?
+      #      (Enter \"No\" to use your own JDK 17 installation) (Y/n)"
+      #   2. "Path to your existing JDK 17 installation:"
+      #   3. "Do you want Bubblewrap to install the Android SDK
+      #      (recommended)? (Y/n)"
+      #   4. "Path to your existing Android SDK installation:"
+      #
+      # An earlier attempt pre-wrote ~/.bubblewrap/config.json hoping
+      # to skip the wizard, but the current Bubblewrap CLI runs it
+      # anyway. Closing stdin (exec </dev/null) made the inquirer
+      # prompt SIGINT with exit 130 because EOF is treated as cancel,
+      # not as the (Y/n) default.
+      #
+      # The robust fix is to *answer* the four prompts directly via
+      # printf piped to stdin: "n" + JAVA_HOME + "n" + ANDROID_HOME.
+      # That tells Bubblewrap to reuse the JDK that setup-java wrote
+      # to JAVA_HOME and the Android SDK that ships pre-installed on
+      # ubuntu-latest under ANDROID_HOME. Once init runs to the end
+      # it persists those choices in ~/.bubblewrap/config.json, so
+      # subsequent commands (update, build) no longer prompt and can
+      # safely run with a closed stdin.
       - name: Generate TWA project
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          exec </dev/null
-          # `init` expects a --manifest flag, but it'll use the
-          # checked-in twa-manifest.json values for everything that
-          # would otherwise be prompted. The URL must be reachable
-          # for the validator to fetch it; --skipPwaValidation
-          # bypasses that on first runs before the web manifest is
-          # deployed.
-          bubblewrap init \
-            --directory=. \
-            --manifest=https://blurayne.github.io/slothlife/manifest.json \
-            --skipPwaValidation || true
-          # `update` re-syncs the Gradle scaffolding from twa-manifest.json
-          # — runs cleanly even on first generation since init wrote the
-          # scaffolding.
-          bubblewrap update --skipVersionUpgrade || true
+          ANDROID_SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "JAVA_HOME=${JAVA_HOME}"
+          echo "ANDROID_SDK_PATH=${ANDROID_SDK_PATH}"
+          # Four-line answer block — order must match the prompt
+          # sequence above. Each answer is on its own line so any
+          # line-buffered prompt reader picks them up cleanly.
+          printf 'n\n%s\nn\n%s\n' "$JAVA_HOME" "$ANDROID_SDK_PATH" | \
+            bubblewrap init \
+              --directory=. \
+              --manifest=https://blurayne.github.io/slothlife/manifest.json \
+              --skipPwaValidation || true
+          echo "--- persisted ~/.bubblewrap/config.json ---"
+          cat "$HOME/.bubblewrap/config.json" || true
+          # Config is now persisted, so update runs prompt-free with
+          # stdin closed as a safety net.
+          bubblewrap update --skipVersionUpgrade </dev/null || true
 
       # Bubblewrap's build prompts for the keystore + key passwords
       # if they're not in env vars (not even `--skipPwaValidation`
