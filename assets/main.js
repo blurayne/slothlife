@@ -4634,7 +4634,21 @@ function _endPan(e){
   const tap = pendingTap;
   pendingTap = null;
   if(!sloth || !slothMode || sloth.state==='FALLING') return;
-  if(sloth.wake()) return;
+  // Wake-then-act: if the sloth was asleep and the tap claimed a
+  // food target, run the tap logic in the newly-awake state so
+  // "tap an apple while sleeping" wakes AND eats in one tap (no
+  // user-visible double-tap requirement). Other taps stay
+  // wake-only — matches the legacy behaviour where a stray tap
+  // anywhere just rouses the sloth without committing to a
+  // swing.
+  if(sloth.wake()){
+    const food = nearestFood(tap.wx, tap.wy);
+    const isFood = food && (
+      (food.kind === 'apple' && food.dist < APPLE_TAP_RADIUS) ||
+      (food.kind === 'leaf'  && food.dist < LEAF_TAP_RADIUS)
+    );
+    if(!isFood) return;
+  }
   if(sloth.state !== 'HANGING') return;
   __runTapLogic(tap.wx, tap.wy);
 }
@@ -4714,7 +4728,15 @@ function __runTapLogic(x, y){
       // moving branches. The IK + arm-length constraints already enforce
       // realism, so any visually-reachable apple should be grabbable.
       const directDist = Math.hypot(f.x - sloth.bodyX, f.y - sloth.bodyY);
-      if(directDist <= armR + 20 && sloth.state === 'HANGING'){
+      // Generous direct-reach radius: armR plus a healthy margin
+      // because ground apples sit BELOW the sloth's body and the
+      // arm-reach check is body-centre-to-apple-centre — vertical
+      // drop quickly eats into the +20 the original threshold
+      // allowed. The groundGrab animation in _eat plays a fixed-
+      // duration extend/hold/retract regardless of whether the
+      // arm visually reaches the apple, so a slightly-too-far
+      // commit still consumes the apple cleanly.
+      if(directDist <= armR + 50 && sloth.state === 'HANGING'){
         Audio.playTargetValid();
         // Keep the sloth on its current branch and chew in place.
         // startEatApple already handles fruit.onGround = true correctly.
@@ -4723,7 +4745,9 @@ function __runTapLogic(x, y){
       } else {
         // Out of direct reach — fall back to the original "via low branch"
         // path: try to find a low branch within mutual reach of both
-        // sloth and apple, then swing there first.
+        // sloth and apple, then swing there first. Looser apple-side
+        // radius (was +30, now +60) so an apple just outside the
+        // direct-reach radius still finds a usable swing target.
         const cands = [];
         for(const b of allBranches()){
           if(b.depth < 1) continue;
@@ -4731,7 +4755,7 @@ function __runTapLogic(x, y){
             const bp = getBranchPt(b, tt);
             const distFromSloth = Math.hypot(bp.x - sloth.bodyX, bp.y - sloth.bodyY);
             const distFromApple = Math.hypot(bp.x - f.x, bp.y - f.y);
-            if(distFromSloth <= armR && distFromApple <= armR + 30){
+            if(distFromSloth <= armR && distFromApple <= armR + 60){
               cands.push({b, tt, score: distFromSloth + distFromApple});
             }
           }
