@@ -391,6 +391,55 @@ applyPanelState();
   }
 }
 
+// INSTALL APP button — Chromium-only A2HS entry point. The
+// `beforeinstallprompt` event fires once the page meets Chrome's
+// install criteria (manifest + SW with fetch handler + served over
+// HTTPS, all true here). Firefox and iOS Safari never fire it, so
+// the row stays hidden there — that's deliberate, since iOS only
+// supports manual share-sheet "Add to Home Screen" and a button
+// promising "install" wouldn't be honest.
+{
+  const rInstall = document.getElementById('r-install');
+  const bInstall = document.getElementById('b-install');
+  if(rInstall && bInstall){
+    // Already running as an installed PWA? Skip wiring entirely so
+    // the row can never appear (the standalone display-mode also
+    // covers TWA / Android-Chrome PWA / iOS standalone navigator).
+    const isStandalone = (
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      window.navigator.standalone === true
+    );
+    if(!isStandalone){
+      let deferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Suppress Chrome desktop's auto mini-infobar; we drive the
+        // prompt from the settings button instead.
+        e.preventDefault();
+        deferredPrompt = e;
+        rInstall.style.display = '';
+      });
+      bInstall.addEventListener('click', async () => {
+        if(!deferredPrompt) return;
+        bInstall.disabled = true;
+        try {
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+        } catch(_){}
+        // The event object is single-use — drop it. If the user
+        // dismissed, Chrome may fire `beforeinstallprompt` again
+        // later and the row will reappear by itself.
+        deferredPrompt = null;
+        rInstall.style.display = 'none';
+        bInstall.disabled = false;
+      });
+      window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        rInstall.style.display = 'none';
+      });
+    }
+  }
+}
+
 // RESTART button — close the panel, drop the current run, and put the
 // player back on the start screen (instead of beginning a new run
 // straight away, the way restartGame() does after a game-over). The

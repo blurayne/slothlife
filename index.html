@@ -320,6 +320,14 @@
     <button id="b-lock-dev" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">EXIT DEV MODE</button></div>
   </div><!-- /.dev-only -->
 
+  <!-- PWA install entry — hidden by default, only revealed once
+       Chromium fires `beforeinstallprompt` (so it self-hides on
+       Firefox / iOS Safari and when already running standalone).
+       Lives outside .dev-only and .player-only so devs can install
+       too. main.js wires the click + visibility. -->
+  <div class="prow" id="r-install" style="display:none"><span class="pname"></span>
+    <button id="b-install" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">INSTALL APP</button></div>
+
   <!-- Bottom-of-panel action — split by mode so exactly one button
        shows up at a time:
        * Dev mode → RESET: hard cache-clear + reload (b-refresh).
