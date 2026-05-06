@@ -112,21 +112,46 @@ jobs:
       # escape hatch (issues #172, #243, #806 all confirm the
       # maintainer hasn't shipped any other automation surface).
       #
-      # Building the JSON via printf — heredoc indentation / shell-
-      # expansion gotchas previously produced subtly-invalid JSON,
-      # which made Config.loadConfig throw, loadOrCreateConfig caught
-      # the throw and fell back to `new Config('', '')` (both fields
-      # empty), and the wizard ran anyway. The printf form is
-      # canonical-single-line JSON and the python step verifies it
-      # parses before any bubblewrap command runs.
-      - name: Pre-configure Bubblewrap (skip first-run wizard)
+      # The Android SDK layout on ubuntu-latest puts the cmdline-tools
+      # at $ANDROID_HOME/cmdline-tools/<version>/, but Bubblewrap's
+      # AndroidSdkTools.checkSdkPath validator requires
+      # $ANDROID_HOME/tools/ or $ANDROID_HOME/bin/ at the SDK root
+      # (older / newer cmdline-tools layouts). Neither exists on the
+      # runner image, so we symlink cmdline-tools/<version> → tools
+      # to satisfy the validator. Without this, init logs:
+      #   "cli ERROR The provided androidSdk isn't correct."
+      - name: Pre-configure Bubblewrap (skip first-run wizard + fix SDK layout)
         run: |
           set -euo pipefail
-          mkdir -p "$HOME/.bubblewrap"
-          ANDROID_SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           : "${JAVA_HOME:?JAVA_HOME must be set by setup-java}"
+          ANDROID_SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
           test -d "$JAVA_HOME"        || { echo "::error::JAVA_HOME path missing: $JAVA_HOME"; exit 1; }
           test -d "$ANDROID_SDK_PATH" || { echo "::error::Android SDK path missing: $ANDROID_SDK_PATH"; exit 1; }
+
+          # Locate the cmdline-tools subdir (could be "latest" or a
+          # version like "16.0"). Pick whichever exists; ls -d / -1
+          # so a single match still reports a usable path.
+          CMDLINE_DIR=$(ls -d "$ANDROID_SDK_PATH"/cmdline-tools/*/ 2>/dev/null | head -1)
+          if [ -z "$CMDLINE_DIR" ]; then
+            echo "::error::No cmdline-tools subdirectory under $ANDROID_SDK_PATH/cmdline-tools/"
+            ls -la "$ANDROID_SDK_PATH/cmdline-tools/" 2>&1 || true
+            exit 1
+          fi
+          CMDLINE_REL="cmdline-tools/$(basename "$CMDLINE_DIR")"
+          echo "Found cmdline-tools at: $ANDROID_SDK_PATH/$CMDLINE_REL"
+          # Symlink only if the validator-expected path isn't already
+          # there. The runner-image owner might be root; use sudo so
+          # the link is writable in / outside the runner home.
+          if [ ! -e "$ANDROID_SDK_PATH/tools" ] && [ ! -e "$ANDROID_SDK_PATH/bin" ]; then
+            sudo ln -sfn "$CMDLINE_REL" "$ANDROID_SDK_PATH/tools"
+            echo "Created symlink: $ANDROID_SDK_PATH/tools -> $CMDLINE_REL"
+          else
+            echo "tools/ or bin/ already present at SDK root, no symlink needed"
+          fi
+          ls -la "$ANDROID_SDK_PATH" | head -20
+
+          # Now write the config that bypasses the first-run wizard.
+          mkdir -p "$HOME/.bubblewrap"
           printf '{"jdkPath":"%s","androidSdkPath":"%s"}\n' \
             "$JAVA_HOME" "$ANDROID_SDK_PATH" \
             > "$HOME/.bubblewrap/config.json"
