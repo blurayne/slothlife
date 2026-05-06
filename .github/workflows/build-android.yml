@@ -190,12 +190,13 @@ jobs:
             | grep -E '^\s*SHA256:' || true
 
       # bubblewrap init reads twa-manifest.json from the repo and
-      # generates the Gradle scaffolding. With the config pre-written
-      # above, no prompts fire — `--version` here is a smoke-test
-      # that the wizard is truly bypassed before the longer init
-      # step runs. If the wizard ever returns, this short call is
-      # where it'll fail, with full diagnostic context (config file
-      # contents printed in the previous step).
+      # generates the Gradle scaffolding INCLUDING manifest-checksum.json,
+      # which `bubblewrap build` later reads to verify the project is
+      # in sync. If init fails silently the checksum is missing and
+      # build prompts "would you like to regenerate your project?"
+      # — which used to hang the runner. So no `|| true` here: any
+      # init failure has to surface. The trailing `ls -la` confirms
+      # the checksum file actually landed.
       - name: Generate TWA project
         timeout-minutes: 10
         run: |
@@ -204,20 +205,27 @@ jobs:
           bubblewrap init \
             --directory=. \
             --manifest=https://blurayne.github.io/slothlife/manifest.json \
-            --skipPwaValidation || true
-          bubblewrap update --skipVersionUpgrade || true
+            --skipPwaValidation
+          ls -la manifest-checksum.json twa-manifest.json
 
-      # Bubblewrap's build prompts for the keystore + key passwords
-      # if they're not in env vars (not even `--skipPwaValidation`
-      # bypasses that). Both BUBBLEWRAP_*_PASSWORD vars are set at
-      # the workflow-env level above, so build runs straight through.
-      # Stdin is closed as a final safety net.
+      # Bubblewrap's build can still raise prompts beyond the wizard:
+      # stale-checksum, signing-key questions, etc. Two safety nets:
+      #
+      #   1. `script(1)` allocates a real PTY so inquirer (which reads
+      #      from /dev/tty, not process.stdin) accepts piped input.
+      #   2. `yes y` continuously feeds "y\n" answers — any confirm
+      #      prompt is auto-accepted. The keystore-password env vars
+      #      (workflow scope) cover the only non-confirm prompts in
+      #      practice; `yes y` is belt-and-braces for anything else.
+      #
+      # `exec </dev/null` deliberately NOT used here: closing stdin
+      # made inquirer SIGINT 130. Working pattern borrowed from
+      # github.com/sharadcodes/pwa-to-apk-action's entrypoint.sh.
       - name: Build TWA
         timeout-minutes: 15
         run: |
           set -euo pipefail
-          exec </dev/null
-          bubblewrap build --skipPwaValidation
+          yes y | script -qec "bubblewrap build --skipPwaValidation" /dev/null
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
