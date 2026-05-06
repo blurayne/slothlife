@@ -82,6 +82,28 @@ jobs:
             echo "::error::index.html still has app-version=dev — sed failed"
             exit 1
           fi
+      # Rasterise assets/favicon.svg → /icons/*.png so manifest.json
+       # (and the Bubblewrap-generated TWA) can reference real PNGs.
+       # Done at deploy time so the icons stay in lockstep with the
+       # SVG source — no binary blobs in git. The maskable variant
+       # composites the icon over the panel-color background so
+       # Android's circular / squircle masks crop the background, not
+       # the face (Android requires ≥10% padding on all sides for
+       # maskable icons).
+      - name: Render PNG icons from SVG
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin imagemagick
+          mkdir -p icons
+          rsvg-convert -w 192 -h 192 assets/favicon.svg -o icons/icon-192.png
+          rsvg-convert -w 512 -h 512 assets/favicon.svg -o icons/icon-512.png
+          rsvg-convert -w 410 -h 410 assets/favicon.svg -o icons/_inner.png
+          convert -size 512x512 xc:'#7A4A28' \
+            \( icons/_inner.png \) -gravity center -composite \
+            icons/icon-mask-512.png
+          rm icons/_inner.png
+          ls -la icons/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .

@@ -5,10 +5,13 @@
   "description": "Sloth's Life — a windy-tree browser game. Static frontend (no build) + optional Convex backend for shared highscores when deployed to Vercel.",
   "scripts": {
     "convex:dev":    "convex dev",
-    "convex:deploy": "convex deploy"
+    "convex:deploy": "convex deploy",
+    "android:build": "bubblewrap build --skipPwaValidation",
+    "android:update": "bubblewrap update --skipVersionUpgrade"
   },
   "devDependencies": {
-    "convex":     "^1.16.0",
-    "typescript": "^5.4.0"
+    "@bubblewrap/cli": "^1.23.0",
+    "convex":          "^1.16.0",
+    "typescript":      "^5.4.0"
   }
 }

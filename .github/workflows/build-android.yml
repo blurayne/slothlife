@@ -1,0 +1,136 @@
+# Builds the Android TWA (Trusted Web Activity) wrapper for the
+# deployed Pages site, using Bubblewrap. Produces a debug-signed
+# APK + AAB as a workflow artifact — sideloadable directly.
+#
+# IMPORTANT — first-run reality check:
+#   * Bubblewrap's build needs a real PNG icon set live at the
+#     deployed origin (referenced by twa-manifest.json's iconUrl /
+#     maskableIconUrl). The deploy-pages workflow renders these
+#     into /icons/ on every Pages deploy, so push to main and
+#     wait for that workflow to finish before triggering this one.
+#   * The keystore generated below is throwaway / debug-only.
+#     For Play Store releases, replace the keytool step with one
+#     that pulls a real keystore + passwords from repository
+#     secrets (ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASS, …).
+#   * For Play Store distribution you also need an
+#     /.well-known/assetlinks.json on blurayne.github.io carrying
+#     the SHA-256 fingerprint of the signing key. Until that's
+#     hosted on the *root* domain (this repo deploys at /slothlife/,
+#     not the root) the address bar will show inside the TWA.
+#
+# Manual trigger only — sloth's-life web releases don't need to
+# block on Android builds, so the workflow runs on workflow_dispatch.
+
+name: Build Android (TWA)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Bubblewrap drives Gradle, which needs a JDK. Temurin 17 is
+      # the long-term-support default that the Android Gradle Plugin
+      # currently targets.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Render the same PNGs the deploy-pages workflow ships, so
+      # bubblewrap can pick them up locally without depending on
+      # network availability of the deployed icons.
+      - name: Render PNG icons from SVG
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin imagemagick
+          mkdir -p icons
+          rsvg-convert -w 192 -h 192 assets/favicon.svg -o icons/icon-192.png
+          rsvg-convert -w 512 -h 512 assets/favicon.svg -o icons/icon-512.png
+          rsvg-convert -w 410 -h 410 assets/favicon.svg -o icons/_inner.png
+          convert -size 512x512 xc:'#7A4A28' \
+            \( icons/_inner.png \) -gravity center -composite \
+            icons/icon-mask-512.png
+          rm icons/_inner.png
+          ls -la icons/
+
+      - name: Install Bubblewrap CLI
+        run: npm i -g @bubblewrap/cli@latest
+
+      # Throwaway debug keystore so the build completes end-to-end
+      # without operator interaction. SHA-256 fingerprint is printed
+      # afterwards for assetlinks.json bootstrapping. Replace with
+      # secret-derived keystore for production releases.
+      - name: Generate signing keystore
+        run: |
+          set -euo pipefail
+          keytool -genkeypair \
+            -alias android \
+            -keypass android \
+            -keystore android.keystore \
+            -storepass android \
+            -dname "CN=Sloth, O=Slothlife, C=US" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000
+          echo "--- signing-key SHA-256 (paste into assetlinks.json) ---"
+          keytool -list -v \
+            -keystore android.keystore \
+            -alias android \
+            -storepass android \
+            | grep -E '^\s*SHA256:' || true
+
+      # bubblewrap init reads twa-manifest.json from the working
+      # directory if present (avoids the interactive prompts), then
+      # generates the Gradle scaffolding. --skipPwaValidation lets
+      # this run before manifest.json + icons are live on Pages.
+      - name: Generate TWA project
+        env:
+          # Tell Bubblewrap to use the JDK from setup-java + auto-
+          # install Android SDK / build-tools without prompts.
+          CI: "true"
+        run: |
+          set -euo pipefail
+          # `init` expects a --manifest flag, but it'll use the
+          # checked-in twa-manifest.json values for everything that
+          # would otherwise be prompted. The URL must be reachable
+          # for the validator to fetch it; --skipPwaValidation
+          # bypasses that on first runs before the web manifest is
+          # deployed.
+          bubblewrap init \
+            --directory=. \
+            --manifest=https://blurayne.github.io/slothlife/manifest.json \
+            --skipPwaValidation || true
+          # `update` re-syncs the Gradle scaffolding from twa-manifest.json
+          # — runs cleanly even on first generation since init wrote the
+          # scaffolding.
+          bubblewrap update --skipVersionUpgrade || true
+
+      - name: Build TWA
+        run: bubblewrap build --skipPwaValidation
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: slothlife-android
+          # bubblewrap drops the unsigned + signed APK/AAB at the
+          # repo root. Glob both and let actions/upload-artifact warn
+          # (not fail) if a particular variant didn't materialise.
+          path: |
+            ./*.apk
+            ./*.aab
+          if-no-files-found: warn

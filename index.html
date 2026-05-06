@@ -14,6 +14,13 @@
 <meta name="app-version" content="dev">
 <title>A Sloth's Life</title>
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=dev">
+<!-- PWA / TWA: manifest declares standalone display, icons, and the
+     theme color matched against the panel background so Android's
+     status bar / install prompt blends with the in-game UI.
+     PNG icons under /icons/ are rendered from assets/favicon.svg by
+     the deploy-pages workflow — they don't live in the repo. -->
+<link rel="manifest" href="manifest.json?v=dev">
+<meta name="theme-color" content="#1a1a1a">
 <link rel="stylesheet" href="assets/styles.css?v=dev">
 </head>
 <body>
