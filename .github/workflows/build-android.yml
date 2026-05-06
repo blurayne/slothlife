@@ -86,13 +86,18 @@ jobs:
           ls -la icons/
 
       - name: Install Bubblewrap CLI
-        run: npm i -g --no-audit --no-fund @bubblewrap/cli@latest
-
-      # Log the Bubblewrap version up-front so any future first-run
-      # surprise (the wizard schema has changed between releases) is
-      # easy to diagnose from the workflow log.
-      - name: Bubblewrap version
-        run: bubblewrap --version
+        run: |
+          set -euo pipefail
+          npm i -g --no-audit --no-fund @bubblewrap/cli@latest
+          # Log the version via npm rather than `bubblewrap --version`.
+          # Any direct bubblewrap invocation BEFORE init runs the
+          # first-run wizard (yes, even --version), and the wizard
+          # has no PTY/piped-answers wrapping until the dedicated
+          # init step below — so a bare `bubblewrap --version` here
+          # would dead-end with exit 130 the same way init used to.
+          # `npm ls` reads package.json off disk; no bubblewrap
+          # process spawns.
+          npm ls -g --depth=0 @bubblewrap/cli || true
 
       # Throwaway debug keystore so the build completes end-to-end
       # without operator interaction. SHA-256 fingerprint is printed
@@ -175,8 +180,12 @@ jobs:
               --skipPwaValidation" /dev/null || true
           echo "--- persisted ~/.bubblewrap/config.json ---"
           cat "$HOME/.bubblewrap/config.json" || true
-          # Config is now persisted, so update runs prompt-free with
-          # stdin closed as a safety net.
+          # Now that init has persisted the config, every subsequent
+          # bubblewrap call is prompt-free. Log the runtime version
+          # here for diagnostics — safe to run direct since the
+          # wizard is gone.
+          bubblewrap --version || true
+          # update runs prompt-free with stdin closed as a safety net.
           bubblewrap update --skipVersionUpgrade </dev/null || true
 
       # Bubblewrap's build prompts for the keystore + key passwords
