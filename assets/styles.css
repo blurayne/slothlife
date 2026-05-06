@@ -357,6 +357,20 @@
   }
   .ov-btn:hover{background:linear-gradient(180deg,#4a7020,#2c5012)}
 
+  /* Secondary action — muted dark-grey + amber text. Used for
+     RESTART next to a primary SAVE SCORE so the eye doesn't
+     read the two as equally weighted. */
+  .ov-btn--secondary{
+    background:#1a1a1a;
+    color:#cfa45a;
+    border:1px solid #555;
+    margin-top:8px;
+  }
+  .ov-btn--secondary:hover{
+    background:#2a2a2a;
+    color:#e8b870;
+  }
+
   /* Highscore table — six columns (#, SLOTH, WHEN, LASTED, SCORE,
      LIVES) on every surface. Padding is tight so the start/end
      overlay cards fit all six on a typical mobile portrait

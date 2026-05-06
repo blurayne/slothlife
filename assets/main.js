@@ -444,41 +444,55 @@ applyPanelState();
   }
 }
 
-// RESTART button — close the panel, drop the current run, and put the
-// player back on the start screen (instead of beginning a new run
-// straight away, the way restartGame() does after a game-over). The
-// resets here mirror restartGame()'s state-only steps and skip the
-// `spawnSloth()` call so the start screen owns the next play.
+// Shared RESTART action — close any open overlays, drop the current
+// run, and put the player back on the start screen (instead of
+// beginning a new run straight away, the way restartGame() does
+// after a game-over). The resets mirror restartGame()'s state-only
+// steps and skip the `spawnSloth()` call so the start screen owns
+// the next play.
+function _restartToStart(){
+  panelOpen = false;
+  applyPanelState();
+  gameOver       = false;
+  didWin         = false;
+  _endReason     = '';
+  livesBonusGiven = 0;
+  lives          = MAX_LIVES;
+  _livesLost     = [];
+  score          = 0;
+  hunger         = 0.80;
+  displayedHunger = 0.80;
+  gameDaysElapsed = 0;
+  _lastYearMark  = 0;
+  _lastMonthMark = 0;
+  sloth          = null;
+  slothPending   = false;
+  fruits         = [];
+  fallingLeaves  = [];
+  // Reset camera too so the start screen lays over a centred world.
+  worldZoom    = 1.0;
+  sceneOffsetY = 0;
+  panVelX = 0; panVelY = 0;
+  pinch = null;
+  activePointers.clear();
+  showStart();
+}
+
+// Settings-panel RESTART button.
 {
   const bRestartBtn = document.getElementById('b-restart');
   if(bRestartBtn){
-    bRestartBtn.addEventListener('click', () => {
-      panelOpen = false;
-      applyPanelState();
-      gameOver       = false;
-      didWin         = false;
-      _endReason     = '';
-      livesBonusGiven = 0;
-      lives          = MAX_LIVES;
-      _livesLost     = [];
-      score          = 0;
-      hunger         = 0.80;
-      displayedHunger = 0.80;
-      gameDaysElapsed = 0;
-      _lastYearMark  = 0;
-      _lastMonthMark = 0;
-      sloth          = null;
-      slothPending   = false;
-      fruits         = [];
-      fallingLeaves  = [];
-      // Reset camera too so the start screen lays over a centred world.
-      worldZoom    = 1.0;
-      sceneOffsetY = 0;
-      panVelX = 0; panVelY = 0;
-      pinch = null;
-      activePointers.clear();
-      showStart();
-    });
+    bRestartBtn.addEventListener('click', _restartToStart);
+  }
+}
+
+// Name-entry-overlay RESTART button — same effect as the settings
+// panel's RESTART. The user's score is discarded (NOT saved); if
+// they want to keep it they hit SAVE SCORE first.
+{
+  const ovNameRestart = document.getElementById('ov-name-restart');
+  if(ovNameRestart){
+    ovNameRestart.addEventListener('click', _restartToStart);
   }
 }
 
