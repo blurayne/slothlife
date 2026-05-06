@@ -245,19 +245,29 @@ jobs:
           # alone so they continue to point at the deployed PWA).
           # No need to restore the canonical URLs after — the
           # checksum + manifest stay consistent within this CI run.
-          python3 - <<'PY'
-          import json
-          with open('twa-manifest.json') as f: m = json.load(f)
-          for k in ('iconUrl', 'maskableIconUrl'):
-              if k in m and m[k]:
-                  m[k] = m[k].replace(
-                      'https://blurayne.github.io/slothlife/',
-                      'http://127.0.0.1:8765/')
-          with open('twa-manifest.json', 'w') as f:
-              json.dump(m, f, indent=2)
-          PY
-          echo "--- patched iconUrl + maskableIconUrl ---"
+          #
+          # Using sed (not python heredoc) because YAML run-blocks
+          # strip leading indent before bash sees the script —
+          # nesting a python heredoc in there is one indent-quirk
+          # away from silently producing a no-op patch. Two
+          # before/after grep blocks + two `::error` guards make a
+          # silent no-op fail the step instead of cascading into
+          # the canonical-URL 404.
+          echo "--- twa-manifest.json (icon URLs BEFORE patch) ---"
           grep -E '"(icon|maskableIcon)Url"' twa-manifest.json
+          sed -i \
+            's|"https://blurayne.github.io/slothlife/icons/|"http://127.0.0.1:8765/icons/|g' \
+            twa-manifest.json
+          echo "--- twa-manifest.json (icon URLs AFTER patch) ---"
+          grep -E '"(icon|maskableIcon)Url"' twa-manifest.json
+          if grep -q '"https://blurayne.github.io/slothlife/icons/' twa-manifest.json; then
+            echo "::error::twa-manifest.json still contains canonical icon URLs after sed rewrite"
+            exit 1
+          fi
+          if ! grep -q '"http://127.0.0.1:8765/icons/' twa-manifest.json; then
+            echo "::error::twa-manifest.json never picked up the localhost icon URLs"
+            exit 1
+          fi
 
           bubblewrap update --skipVersionUpgrade
           ls -la manifest-checksum.json twa-manifest.json
