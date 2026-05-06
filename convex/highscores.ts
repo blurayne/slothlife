@@ -96,7 +96,7 @@ export const submit = mutation({
     const cleaned = (args.name ?? "").replace(CTRL_RE, "").trim();
     const cps = [...cleaned];
     const name =
-      (cps.slice(0, 8).join("") || "ANON").toLocaleUpperCase();
+      (cps.slice(0, 12).join("") || "ANON").toLocaleUpperCase();
     const score = Math.floor(args.score);
     if (score <= 0)        return null;
     if (score > SCORE_CAP) return null;

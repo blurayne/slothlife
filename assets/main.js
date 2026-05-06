@@ -1868,6 +1868,11 @@ const HS_KEY = 'sloth-safari-hs-v1';
 const HS_MAX_BOARD  = 10;
 const HS_MAX_DIALOG = 100;
 const HS_MAX        = HS_MAX_DIALOG;   // legacy alias used elsewhere
+// Player-name cap, in Unicode CODE POINTS (not UTF-16 units). Same
+// number is enforced server-side in convex/highscores.ts; bumping
+// one side requires bumping the other or the server silently
+// truncates what the client just submitted.
+const MAX_NAME_LEN = 12;
 let highscores = [];
 
 // ── HIGHSCORE BACKEND ────────────────────────────────────
@@ -1970,7 +1975,7 @@ function insertHighscore(name, s, extras = {}){
   // the server-side rule in convex/highscores.ts.
   const cleaned = (name || '???').replace(/[\x00-\x1f\x7f]/g, '').trim();
   const sanitized =
-    ([...cleaned].slice(0, 8).join('') || '???').toLocaleUpperCase();
+    ([...cleaned].slice(0, MAX_NAME_LEN).join('') || '???').toLocaleUpperCase();
   // Sanitise the optional run-summary fields so a malformed extras
   // object can't poison the in-memory list or the localStorage blob.
   const survivedMonths = Number.isFinite(extras.survivedMonths)
@@ -5946,7 +5951,7 @@ document.getElementById('ov-name-btn').addEventListener('click', () => {
   // ("faulbär" → "FAULBÄR") survive intact and emoji aren't split.
   const cleaned = (inp.value || '').replace(/[\x00-\x1f\x7f]/g, '').trim();
   const name =
-    ([...cleaned].slice(0, 8).join('') || 'ANON').toLocaleUpperCase();
+    ([...cleaned].slice(0, MAX_NAME_LEN).join('') || 'ANON').toLocaleUpperCase();
   // endReason maps the run's exit path: 'win' for full survival,
   // 'killed' for player-triggered lightning, otherwise 'gameover'.
   const endReason = didWin ? 'win' : (_endReason === 'killed' ? 'killed' : 'gameover');
@@ -5960,6 +5965,22 @@ document.getElementById('ov-name-btn').addEventListener('click', () => {
 });
 document.getElementById('ov-name-input').addEventListener('keydown', e => {
   if(e.key === 'Enter'){ document.getElementById('ov-name-btn').click(); }
+});
+// HTML maxlength counts UTF-16 code units, so a user typing emoji
+// or other non-BMP chars (each 2 units) can overflow MAX_NAME_LEN
+// code points before the browser stops them. Mirror the submit-time
+// sanitiser here so what the user sees on screen matches what gets
+// saved. Fires for typing, paste, drag-drop, IME commit, and
+// programmatic .value=. Cursor preserve so paste-into-the-middle
+// doesn't jump the caret to the end on every overflow.
+document.getElementById('ov-name-input').addEventListener('input', (e) => {
+  const inp = e.currentTarget;
+  const cps = [...inp.value];
+  if(cps.length <= MAX_NAME_LEN) return;
+  const cursorBefore = inp.selectionStart;
+  inp.value = cps.slice(0, MAX_NAME_LEN).join('');
+  const newPos = Math.min(cursorBefore, inp.value.length);
+  try { inp.setSelectionRange(newPos, newPos); } catch (_) {}
 });
 
 // Hook into game-over: once gameOver flips true, show name entry or end.
