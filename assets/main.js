@@ -3639,7 +3639,12 @@ class Fruit{
     this.x=0; this.y=0;
     this.vx=0; this.vy=0;
     this.rot=0; this.rotV=0;
-    this.r=5.5+Math.random()*2.2;
+    // Per-apple size scatter: -20%..+10% around a 7px base, so an
+    // orchard reads as varied rather than every fruit identical.
+    // Range ≈ 5.6..7.7 (mean 6.65). this.r is used both for the
+    // draw and for ground-rest height + hit-testing, so a single
+    // value here propagates everywhere.
+    this.r=7*(0.80+Math.random()*0.30);
     this.holdStrength=0.40+Math.random()*0.40;
     this.alive=true;
     // Apples in shades of red, orange, amber, and yellow. 60% of fruit
