@@ -70,3 +70,12 @@ citations so the numbers stay verifiable.
 ## Shipped
 
 - `a77c206` — docs: add GAMEPLAY.md.
+- `9361f8e` — docs(GAMEPLAY): correct apple-regrowth claim
+  (apples regrow every Jul-Aug per `main.js:4172-4193`, not
+  finite at start) + add the "Is winning even possible?"
+  chapter answering the user's win-chance follow-up. Chapter
+  walks through the hunger-budget math (≈8.5-10 units demand
+  vs ≈7-10 units supply) and the lightning expectation
+  (~1 hit per 45-min game) and lands on per-tier win-rate
+  estimates (random tapper <1 %, casual ~10-15 %, strategic
+  ~40-55 %, expert ~70-80 %).
