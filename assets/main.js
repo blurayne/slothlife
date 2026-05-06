@@ -51,11 +51,11 @@ const P = {
   fxVol:       0.57,
   // Master multiplier on the sun-shade effect — per-branch tint,
   // trunk gradient, and full-screen soft-light pass all scale by
-  // P.shadeStrength. 1.0 = original mild look; 1.8 (default) gives
+  // P.shadeStrength. 1.0 = original mild look; 1.6 (default) gives
   // a clearly readable rake without crushing colours. Exposed via
   // the dev-mode SHADE STRENGTH slider; clamping happens at the
   // call sites so values up to 6 remain visually sane.
-  shadeStrength: 1.8,
+  shadeStrength: 1.6,
 };
 
 // ════════════════════════════════════════════════════════
@@ -7071,7 +7071,7 @@ const PLAYER_PREFS_KEY = 'sloth-player-prefs';
 // are kept; older / unstamped saves are dropped. Highscores,
 // client-id and dev-mode flag live under other keys and are
 // unaffected.
-const FORCED_PREFS_TIMESTAMP = Date.UTC(2026, 4, 6); // 2026-05-06 00:00 UTC
+const FORCED_PREFS_TIMESTAMP = Date.UTC(2026, 4, 6, 19, 30); // 2026-05-06 19:30 UTC
 function savePlayerPrefs(){
   try {
     localStorage.setItem(PLAYER_PREFS_KEY, JSON.stringify({
