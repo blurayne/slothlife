@@ -21,6 +21,17 @@
      the deploy-pages workflow — they don't live in the repo. -->
 <link rel="manifest" href="manifest.json?v=dev">
 <meta name="theme-color" content="#1a1a1a">
+<!-- iOS Add-to-Home-Screen polish. Apple ignores manifest.json,
+     so these meta tags + the apple-touch-icon link do the same
+     job: standalone launch, status-bar tint matching #1a1a1a,
+     a proper home-screen label and icon. The trailing
+     mobile-web-app-capable is the legacy Android-Chrome twin —
+     harmless on modern Chrome, helpful for older WebViews. -->
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?v=dev">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sloth's Life">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="assets/styles.css?v=dev">
 </head>
 <body>

@@ -1,7 +1,11 @@
 {
+  "id": "/slothlife/",
   "name": "A Sloth's Life",
   "short_name": "Sloth's Life",
   "description": "windy-tree sloth adventure",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games", "entertainment"],
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

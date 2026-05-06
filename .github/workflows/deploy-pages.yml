@@ -98,6 +98,11 @@ jobs:
           mkdir -p icons
           rsvg-convert -w 192 -h 192 assets/favicon.svg -o icons/icon-192.png
           rsvg-convert -w 512 -h 512 assets/favicon.svg -o icons/icon-512.png
+          # 180×180 apple-touch-icon — Apple ignores the manifest's
+          # icon array and looks for this file via <link rel="apple-
+          # touch-icon"> in index.html. Without it iOS Safari uses
+          # a screenshot of the page when "Add to Home Screen" runs.
+          rsvg-convert -w 180 -h 180 assets/favicon.svg -o icons/apple-touch-icon.png
           rsvg-convert -w 410 -h 410 assets/favicon.svg -o icons/_inner.png
           convert -size 512x512 xc:'#7A4A28' \
             \( icons/_inner.png \) -gravity center -composite \
