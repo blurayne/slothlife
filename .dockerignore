@@ -34,9 +34,11 @@ store_icon.png
 # Source-of-truth files unrelated to the static payload.
 README.md
 GAMEPLAY.md
+IDEAS.md
 TWA.md
 PLAN.md
 LICENSE
+docs/
 helm/
 docker-compose.yml
 mise.toml

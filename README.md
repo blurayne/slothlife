@@ -7,21 +7,44 @@
 > - GitHub Pages: <https://blurayne.github.io/slothlife/> *(per-browser highscores)*
 > - Vercel:       <https://slothlife.vercel.app/> *(shared Convex highscores)*
 
+<p align="center">
+  <img src="docs/screenshots/spring-rain.jpg"   alt="Spring — full canopy, light rain"      width="32%">
+  <img src="docs/screenshots/autumn-leaves.jpg" alt="Autumn — golden canopy, leaves falling" width="32%">
+  <img src="docs/screenshots/winter-snow.jpg"   alt="Winter — bare branches, snow on the ground" width="32%">
+</p>
+
 A tiny browser game: guide a sloth through a windswept tree, swing
 between branches, eat leaves and apples, sleep through the lean
-hours, and try not to starve or fall.
+hours, and try not to starve or fall. The world cycles through
+spring, summer, autumn, and winter — apples ripen in summer, the
+canopy turns gold and sheds in autumn, and the bare-branch winter
+forces you to live off whatever you stockpiled.
 
 ## How to play
 
-- **Tap a branch** to swing the sloth toward it.
-- **Tap an apple** for **+15 pts**, **tap a leaf** for **+1 pt**.
-- **Survive a full in-game month** for **+50 pts**.
-- **Swipe the grass** to pan the scene left or right.
-- The hunger bar drains constantly — keep eating. Sleeping slows
-  the drain.
-- **Space** or tap the clock to pause.
-- A fall or starvation costs a life. Three lives total.
-- Eat every apple to win; each surviving life is **+250 pts**.
+- Tap a **branch** to swing the sloth there.
+- Tap an **apple** *(+15 pts)* to eat it.
+- Tap a **leaf** *(+1 pt)* for a snack.
+- Survive 1 **in-game month**: *+50 pts*.
+- Swipe the **grass** to scroll; **pinch** / **scroll-wheel** to zoom.
+- The hunger bar drains constantly — keep eating!
+- **Sleeping** conserves energy.
+- **Space** / tap the **clock** = pause.
+- Falls and starvation cost a *life*. Three lives total.
+- Survive 30 in-game months to win. Each remaining life adds
+  **+250 pts**.
+
+> **TIP** — A falling sloth can still grab a passing branch.
+> Climb too high and lightning will find you; too low and
+> you'll slip off the tree.
+
+> **NOTE** — A full game lasts up to ~45 minutes. See it through
+> and you'll have earned the title of sloth — and learned the
+> only secret that matters: how to survive while doing (almost)
+> nothing.
+
+For the full strategy, scoring math, and per-month survival
+plan, see [GAMEPLAY.md](GAMEPLAY.md).
 
 ## Settings
 
@@ -55,7 +78,8 @@ The page uses `fetch()` to load audio, which doesn't work over
     # then open http://localhost:8000/
 
 There is no build step — `index.html` loads `assets/styles.css`,
-`assets/main.js` and three MP3s directly.
+`assets/main.js` and the seven MP3s in `assets/audio/`
+(five soundtracks plus the snore + thunder SFX) directly.
 
 ## Layout
 
@@ -68,7 +92,8 @@ There is no build step — `index.html` loads `assets/styles.css`,
     assets/main.js          game (single ES file, no build)
     assets/version.js       build stamp (rewritten on each deploy)
     assets/backend-config.js CONVEX_URL stamp (rewritten on Vercel)
-    assets/audio/           four soundtrack mp3s + snore + thunder
+    assets/audio/           five soundtrack mp3s + snore + thunder
+    docs/screenshots/       readme preview shots (spring/autumn/winter)
     convex/                 TypeScript backend (schema + functions)
       schema.ts             highscore table definition
       highscores.ts         list (query) + submit (mutation)
