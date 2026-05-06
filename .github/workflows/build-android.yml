@@ -270,7 +270,16 @@ jobs:
           fi
 
           bubblewrap update --skipVersionUpgrade
-          ls -la manifest-checksum.json twa-manifest.json
+          # Diagnostic: log what update produced. manifest-checksum.json
+          # is NOT written by update — `bubblewrap build` writes it (and
+          # prompts to regenerate if missing on a subsequent run). The
+          # `yes y | script -qec "bubblewrap build" /dev/null` wrapper
+          # on the next step auto-confirms that prompt, so we don't
+          # need the checksum to exist before build runs.
+          ls -la twa-manifest.json
+          ls -la manifest-checksum.json 2>/dev/null \
+            && echo "(checksum file already present)" \
+            || echo "(no manifest-checksum.json yet — build will create / regenerate)"
 
       # Bubblewrap's build can still raise prompts beyond the wizard:
       # stale-checksum, signing-key questions, etc. Two safety nets:
