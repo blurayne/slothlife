@@ -71,6 +71,27 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm i -g @bubblewrap/cli@latest
 
+      # First-run gate: without a pre-written config, bubblewrap drops
+      # into an interactive wizard ("Do you want Bubblewrap to install
+      # the JDK (recommended)? (Y/n)") on the first command, which on
+      # a TTY-less GHA runner hangs until SIGINT (exit code 130).
+      # CI=true does NOT skip that wizard. Pre-populate the config so
+      # bubblewrap finds an existing JDK + Android SDK and never
+      # prompts. JAVA_HOME is set by setup-java; ANDROID_HOME ships
+      # pre-installed on ubuntu-latest at /usr/local/lib/android/sdk.
+      - name: Configure Bubblewrap (pin JDK + Android SDK paths)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.bubblewrap"
+          cat > "$HOME/.bubblewrap/config.json" <<EOF
+          {
+            "jdkPath": "${JAVA_HOME}",
+            "androidSdkPath": "${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          }
+          EOF
+          echo "--- ~/.bubblewrap/config.json ---"
+          cat "$HOME/.bubblewrap/config.json"
+
       # Throwaway debug keystore so the build completes end-to-end
       # without operator interaction. SHA-256 fingerprint is printed
       # afterwards for assetlinks.json bootstrapping. Replace with
