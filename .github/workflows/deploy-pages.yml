@@ -23,6 +23,9 @@ concurrency:
 # artifact / deploy-pages working when Node 20 is removed in Sep 2026.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  # Keep apt-get postinst scripts (tzdata, …) from prompting and
+  # hanging the runner during the icon-render step's package install.
+  DEBIAN_FRONTEND: noninteractive
 
 jobs:
   deploy:

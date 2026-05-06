@@ -31,10 +31,27 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  # Workflow-wide non-interactive defaults. CI=true is read by many
+  # tools (npm, Vercel CLI, Convex, …) to disable spinners + prompts.
+  # DEBIAN_FRONTEND=noninteractive prevents apt postinst scripts
+  # (tzdata, …) from prompting and hanging the runner.
+  CI: "true"
+  DEBIAN_FRONTEND: noninteractive
+  # Throwaway debug-keystore passwords. The same string is passed to
+  # `keytool -genkeypair` below and read by Bubblewrap's build step
+  # via these env vars — keeps both ends in lockstep and means the
+  # build never drops to an interactive password prompt. Replace
+  # both with secret-derived values for production releases.
+  BUBBLEWRAP_KEYSTORE_PASSWORD: android
+  BUBBLEWRAP_KEY_PASSWORD: android
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Belt-and-suspenders: the per-step timeouts below kill any single
+    # hung command quickly, and this job-level cap means a stuck
+    # workflow can't burn more than 30 min of runner time.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -69,7 +86,7 @@ jobs:
           ls -la icons/
 
       - name: Install Bubblewrap CLI
-        run: npm i -g @bubblewrap/cli@latest
+        run: npm i -g --no-audit --no-fund @bubblewrap/cli@latest
 
       # First-run gate: without a pre-written config, bubblewrap drops
       # into an interactive wizard ("Do you want Bubblewrap to install
@@ -96,14 +113,20 @@ jobs:
       # without operator interaction. SHA-256 fingerprint is printed
       # afterwards for assetlinks.json bootstrapping. Replace with
       # secret-derived keystore for production releases.
+      #
+      # `-noprompt` makes keytool fail fast rather than wait on stdin
+      # if any required field is missing — the explicit -dname /
+      # -keypass / -storepass already cover everything keytool would
+      # otherwise ask for, but -noprompt is cheap insurance.
       - name: Generate signing keystore
         run: |
           set -euo pipefail
           keytool -genkeypair \
+            -noprompt \
             -alias android \
-            -keypass android \
+            -keypass "${BUBBLEWRAP_KEY_PASSWORD}" \
             -keystore android.keystore \
-            -storepass android \
+            -storepass "${BUBBLEWRAP_KEYSTORE_PASSWORD}" \
             -dname "CN=Sloth, O=Slothlife, C=US" \
             -keyalg RSA \
             -keysize 2048 \
@@ -112,20 +135,24 @@ jobs:
           keytool -list -v \
             -keystore android.keystore \
             -alias android \
-            -storepass android \
+            -storepass "${BUBBLEWRAP_KEYSTORE_PASSWORD}" \
             | grep -E '^\s*SHA256:' || true
 
       # bubblewrap init reads twa-manifest.json from the working
       # directory if present (avoids the interactive prompts), then
       # generates the Gradle scaffolding. --skipPwaValidation lets
       # this run before manifest.json + icons are live on Pages.
+      #
+      # `exec </dev/null` closes stdin for every subsequent command in
+      # this script. If any bubblewrap subcommand still tries to
+      # prompt despite the pre-written config, it gets EOF and fails
+      # fast instead of hanging the runner. The step-level
+      # timeout-minutes is the last line of defence.
       - name: Generate TWA project
-        env:
-          # Tell Bubblewrap to use the JDK from setup-java + auto-
-          # install Android SDK / build-tools without prompts.
-          CI: "true"
+        timeout-minutes: 10
         run: |
           set -euo pipefail
+          exec </dev/null
           # `init` expects a --manifest flag, but it'll use the
           # checked-in twa-manifest.json values for everything that
           # would otherwise be prompted. The URL must be reachable
@@ -141,8 +168,17 @@ jobs:
           # scaffolding.
           bubblewrap update --skipVersionUpgrade || true
 
+      # Bubblewrap's build prompts for the keystore + key passwords
+      # if they're not in env vars (not even `--skipPwaValidation`
+      # bypasses that). Both BUBBLEWRAP_*_PASSWORD vars are set at
+      # the workflow-env level above, so build runs straight through.
+      # Stdin is closed as a final safety net.
       - name: Build TWA
-        run: bubblewrap build --skipPwaValidation
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          exec </dev/null
+          bubblewrap build --skipPwaValidation
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
