@@ -10,6 +10,9 @@ _(none — see "Shipped this batch" below.)_
 
 ## Shipped this batch
 
+- [x] **Highscore name cap 8 → 12 + live code-point-aware input cap** — fixes the visible-vs-saved-name disagreement caused by HTML `maxlength` counting UTF-16 units while every JS sanitiser counts code points — [plan](.claude/plans/highscore-name-cap-12-and-input-fix.md)
+- [x] **`GAMEPLAY.md` — strategy & stats field guide** — survival math, month-by-month strategy, scoring breakdown, win-chance chapter — [plan](.claude/plans/gameplay-md-strategy-guide.md)
+- [x] **`WEB_IMPRINT` env-var → German Impressum dialog** — deploy-time secret stamps `assets/imprint.js` (multiline-safe via `node + JSON.stringify`); link on the start screen opens a DSGVO-compliant modal. Iterated through three placements (viewport-fixed footer → in-card footer → in-card pair → start-screen-only after the user dropped the panel link) — [plan](.claude/plans/web-imprint-env-var.md)
 - [x] **Bubblewrap CI hardening** — non-interactive Android workflow (config pre-write, SDK-layout symlink, `init` → `update` swap, local icon-server) — [plan](.claude/plans/bubblewrap-ci-hardening.md)
 - [x] **PWA install button + fullscreen on installed launch** — wire missing DOM, flip manifest `display` to `fullscreen` — [plan](.claude/plans/pwa-install-button-and-fullscreen.md)
 - [x] **Declare GPL-3.0-or-later + audit third-party credits** — drop canonical `LICENSE`, fill `package.json` field, rewrite README credits — [plan](.claude/plans/license-gpl3-and-credits-audit.md)
