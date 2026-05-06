@@ -32,7 +32,7 @@ const P = {
   swing:       0.70,
   depth:       3.5,
   leaves:      2,
-  armReach:    2.0,
+  armReach:    1.8,
   grabChance:  1.00,
   fallGravity: 1.0,
   reachTime:   2.0,
