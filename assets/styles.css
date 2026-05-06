@@ -464,32 +464,12 @@
     line-height:1.4;
   }
 
-  /* Start-screen viewport-bottom footer. Sits below the centred
-     .ov-card. GitHub link on top, Impressum below. The footer is
-     position:fixed so even an over-tall card that scrolls within
-     the .overlay still leaves the footer pinned to the visible
-     bottom of the window. The fixed positioning escapes the
-     .overlay's stacking context, so a high z-index ensures the
-     footer renders above the backdrop blur. The .overlay's
-     `display:none.hidden` rule still hides this whole subtree
-     during gameplay. */
-  .ov-footer{
-    position:fixed;
-    bottom:6px;
-    left:0;right:0;
-    text-align:center;
-    z-index:31;
-    pointer-events:none;
-  }
-  .ov-footer > *{ pointer-events:auto; }
-  .ov-footer .ov-imprint-link{ margin-top:4px; }
-  .ov-footer .ov-repo{ margin-top:0; }
-
   /* Footer-link styling on the start screen + the settings panel.
      Both links share .ov-imprint-link / .pimprint visuals: small,
      muted, underlined, brightens on hover. Hidden by default;
      main.js shows them only when window.WEB_IMPRINT is non-empty. */
   .ov-imprint-link{
+    margin-top:4px;
     font-size:10px;
     letter-spacing:.12em;
     text-align:center;
