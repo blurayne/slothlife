@@ -34,7 +34,7 @@ const P = {
   leaves:      2,
   armReach:    1.8,
   grabChance:  1.00,
-  fallGravity: 1.0,
+  fallGravity: 1.8,
   reachTime:   2.0,
   pixelSize:   3,
   detail:      1.00,
@@ -4696,15 +4696,15 @@ function monthFmt(v){
 function getSeasonInfo(t){
   // Use calendar months. seasonTime ∈ [0,1] → month ∈ [0,12).
   // Calendar bands:
-  //   WINTER  — Jan/Feb/Mar (m 0-2)
-  //   SPRING  — Apr/May/Jun (m 3-5)
-  //   SUMMER  — Jul/Aug/Sep (m 6-8)
-  //   AUTUMN  — Oct/Nov/Dec (m 9-11)
+  //   WINTER  — Jan/Feb        (m 0-1)
+  //   SPRING  — Mar..Jun       (m 2-5)   ← gains March; winter ends one month earlier
+  //   SUMMER  — Jul/Aug/Sep    (m 6-8)
+  //   AUTUMN  — Oct/Nov/Dec    (m 9-11)
   // Game starts in April (m 3) and runs 12 in-game months → ends back at April.
   // Visiting order: SPRING → SUMMER → AUTUMN → WINTER (then game ends).
   const m = (t * 12) % 12;
   let name = 'SPRING';
-  if(m < 3)        name = 'WINTER';
+  if(m < 2)        name = 'WINTER';
   else if(m < 6)   name = 'SPRING';
   else if(m < 9)   name = 'SUMMER';
   else             name = 'AUTUMN';
@@ -4712,7 +4712,7 @@ function getSeasonInfo(t){
   // leafiness: tree is full in spring/summer (we DON'T grow new leaves
   // during the game — they start full), drops in autumn, gone in winter.
   let leafiness = 1;
-  if(m < 3)        leafiness = 0;                  // winter — bare
+  if(m < 2)        leafiness = 0;                  // winter — bare
   else if(m < 6)   leafiness = 1;                  // spring — already in leaf
   else if(m < 9)   leafiness = 1;                  // summer — full canopy
   else             leafiness = 1 - (m - 9) / 3;    // autumn — leaves fall
@@ -4721,21 +4721,21 @@ function getSeasonInfo(t){
   let autumnTint = 0;
   if(m >= 9 && m < 12){
     autumnTint = Math.min(1, (m - 9) / 0.8);
-  } else if(m < 3){
+  } else if(m < 2){
     autumnTint = 1;   // any stragglers stay autumn-colored in early winter
   }
 
-  // winterness: 0 outside winter, 1 deep winter. Fades in late Dec, out late Mar.
+  // winterness: 0 outside winter, 1 deep winter. Fades in late Dec, out late Feb.
   let winterness = 0;
   if(m >= 11.5 && m < 12) winterness = (m - 11.5) / 0.5;
-  else if(m < 2.5)        winterness = 1;
-  else if(m < 3)          winterness = 1 - (m - 2.5) / 0.5;
+  else if(m < 1.5)        winterness = 1;
+  else if(m < 2)          winterness = 1 - (m - 1.5) / 0.5;
 
   // appleGrowth: apples present from start (we DON'T grow them on the
   // tree mid-game). They drop in autumn. Used only by the apple drop logic;
   // there's no apple-regrowth path during a game now.
   let appleGrowth = 1;
-  if(m < 3)        appleGrowth = 0;                       // winter — bare
+  if(m < 2)        appleGrowth = 0;                       // winter — bare
   else if(m < 6)   appleGrowth = 1;                       // spring
   else if(m < 9)   appleGrowth = 1;                       // summer
   else             appleGrowth = 1 - (m - 9) / 3;         // autumn — fall off
@@ -6713,7 +6713,10 @@ function frame(ts){
   // Game-over → either prompt for name or show end screen
   _checkPostGameTransition();
 
-  // Hunger decay (half-rate when sleeping). At 0 → starvation.
+  // Hunger decay. While SLEEPING the rate is 70% of the awake rate
+  // (HUNGER_DECAY_ASLEEP = HUNGER_DECAY_AWAKE × 0.70 — see the
+  // 11.5-month sleep calibration block higher up). i.e. ~30% energy
+  // saving while asleep. At 0 → starvation.
   if(sloth && sloth.alive && !gameOver){
     if(sloth.state !== 'STARVING'){
       const baseDecay = sloth.state === 'SLEEPING' ? HUNGER_DECAY_ASLEEP : HUNGER_DECAY_AWAKE;
