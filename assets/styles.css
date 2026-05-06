@@ -424,6 +424,68 @@
     background:rgba(255,255,255,.10); border-radius:2px;
   }
 
+  /* IMPRESSUM dialog — German legal-imprint shown when the
+     WEB_IMPRINT env var is stamped in at deploy time. The
+     contact block (env value) renders verbatim in monospace
+     with line breaks preserved; the surrounding boilerplate
+     (Haftung, Datenschutz, …) renders as normal HTML.
+     Modal is wider than the standard ov-card to let the legal
+     paragraphs breathe; body scrolls if the text grows long. */
+  .imprint-dialog .ov-card{ max-width:560px; }
+  .imprint-body{
+    max-height:70vh;
+    overflow-y:auto;
+    text-align:left;
+    font-size:12px;
+    line-height:1.5;
+    color:rgba(225,235,245,.92);
+    padding-right:6px;
+  }
+  .imprint-body h3{
+    margin:14px 0 6px;
+    font-size:11px;
+    letter-spacing:.14em;
+    color:rgba(140,200,150,.95);
+    border-bottom:1px solid rgba(255,255,255,.08);
+    padding-bottom:4px;
+    text-transform:uppercase;
+  }
+  .imprint-body h3:first-child{ margin-top:0; }
+  .imprint-body p{ margin:6px 0; }
+  .imprint-contact{
+    font-family:'Courier New',monospace;
+    white-space:pre-wrap;        /* preserve raw line breaks */
+    background:rgba(0,0,0,.30);
+    border-left:3px solid #FFE678;
+    padding:8px 10px;
+    margin:6px 0 12px;
+    color:#FFE678;
+    font-size:12px;
+    line-height:1.4;
+  }
+
+  /* Footer-link styling on the start screen + the settings panel.
+     Both links share .ov-imprint-link / .pimprint visuals: small,
+     muted, underlined, brightens on hover. Hidden by default;
+     main.js shows them only when window.WEB_IMPRINT is non-empty. */
+  .ov-imprint-link{
+    margin-top:6px;
+    font-size:10px;
+    letter-spacing:.12em;
+    text-align:center;
+  }
+  .ov-imprint-link a,
+  .pimprint{
+    color:rgba(180,210,235,.65);
+    text-decoration:underline;
+  }
+  .ov-imprint-link a:hover,
+  .pimprint:hover{ color:#fff; }
+  .pimprint{
+    font:bold 11px 'Courier New',monospace;
+    letter-spacing:.10em;
+  }
+
   /* Name entry */
   .ov-name-input{
     width:100%;

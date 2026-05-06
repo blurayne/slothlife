@@ -67,6 +67,9 @@
     <div class="ov-repo">
       <a href="https://github.com/blurayne/slothlife" target="_blank" rel="noopener noreferrer">github.com/blurayne/slothlife</a>
     </div>
+    <div class="ov-imprint-link" id="r-imprint-start" style="display:none">
+      <a href="#" id="b-imprint-start">Impressum</a>
+    </div>
     <div class="ov-version js-version-stack"></div>
   </div>
 </div>
@@ -99,6 +102,17 @@
       <div id="ov-hs-table"></div>
     </div>
     <button id="ov-hs-close" class="ov-btn">CLOSE</button>
+  </div>
+</div>
+
+<!-- IMPRESSUM DIALOG (only when WEB_IMPRINT is set at deploy time;
+     opened from the Impressum link on the start screen + settings
+     panel; body populated by main.js's renderImprintHTML). -->
+<div id="ov-imprint" class="overlay hidden imprint-dialog">
+  <div class="ov-card">
+    <div class="ov-title">IMPRESSUM</div>
+    <div class="imprint-body" id="ov-imprint-body"></div>
+    <button id="ov-imprint-close" class="ov-btn">SCHLIESSEN</button>
   </div>
 </div>
 
@@ -357,6 +371,9 @@
        row (env · version · build / date · SHA). Dev mode hides
        this because the same stamp lives directly under the
        DEVELOPER SETTINGS title above. -->
+  <div class="prow player-only" id="r-imprint-panel" style="display:none;justify-content:center">
+    <a href="#" id="b-imprint-panel" class="pimprint">Impressum</a>
+  </div>
   <div class="pversion-foot js-version-allbottom player-only"></div>
 </div>
 
@@ -364,6 +381,7 @@
 
 <script src="assets/version.js?v=dev"></script>
 <script src="assets/backend-config.js?v=dev"></script>
+<script src="assets/imprint.js?v=dev"></script>
 <script src="assets/main.js?v=dev"></script>
 </body>
 </html>

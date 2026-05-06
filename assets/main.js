@@ -1313,6 +1313,122 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ── IMPRESSUM dialog (German legal imprint) ─────────────────
+// The link on the start screen + the link at the bottom of the
+// settings panel are both hidden until window.WEB_IMPRINT is
+// stamped in at deploy time (assets/imprint.js, written by the
+// deploy workflows from the WEB_IMPRINT secret). Empty value =
+// no link, no dialog. Multi-line raw text from the secret
+// renders verbatim in a monospace block; surrounding German
+// legal boilerplate is built by renderImprintHTML below.
+const _hasImprint = !!(window.WEB_IMPRINT &&
+                       String(window.WEB_IMPRINT).trim());
+const ovImprint      = document.getElementById('ov-imprint');
+const ovImprintBody  = document.getElementById('ov-imprint-body');
+const ovImprintClose = document.getElementById('ov-imprint-close');
+const rImprintStart  = document.getElementById('r-imprint-start');
+const rImprintPanel  = document.getElementById('r-imprint-panel');
+const bImprintStart  = document.getElementById('b-imprint-start');
+const bImprintPanel  = document.getElementById('b-imprint-panel');
+
+// Build the modal HTML. The env block goes through escapeHtml so
+// `<` `>` `&` `"` in addresses (e.g. e-mail brackets like
+// "Name <a@b.de>") render literally instead of injecting markup.
+// The surrounding boilerplate is plain HTML controlled by us.
+function renderImprintHTML(rawAddress){
+  const addr = escapeHtml(String(rawAddress || '').trim());
+  return (
+    '<h3>Angaben gemäß § 5 TMG</h3>' +
+    '<pre class="imprint-contact">' + addr + '</pre>' +
+
+    '<h3>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h3>' +
+    '<p>Anschrift wie oben.</p>' +
+
+    '<h3>Haftungsausschluss</h3>' +
+    '<p><strong>Haftung für Inhalte:</strong> Die Inhalte dieser ' +
+    'Seite wurden mit größtmöglicher Sorgfalt erstellt. Für die ' +
+    'Richtigkeit, Vollständigkeit und Aktualität der Inhalte ' +
+    'kann jedoch keine Gewähr übernommen werden. Als ' +
+    'Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene ' +
+    'Inhalte auf diesen Seiten nach den allgemeinen Gesetzen ' +
+    'verantwortlich.</p>' +
+    '<p><strong>Haftung für Links:</strong> Diese Seite kann ' +
+    'Links zu externen Webseiten Dritter enthalten, auf deren ' +
+    'Inhalte wir keinen Einfluss haben. Deshalb können wir für ' +
+    'diese fremden Inhalte auch keine Gewähr übernehmen. Für die ' +
+    'Inhalte der verlinkten Seiten ist stets der jeweilige ' +
+    'Anbieter oder Betreiber der Seiten verantwortlich.</p>' +
+    '<p><strong>Urheberrecht:</strong> Die durch die Seitenbetreiber ' +
+    'erstellten Inhalte und Werke unterliegen dem deutschen ' +
+    'Urheberrecht. Vervielfältigung, Bearbeitung, Verbreitung und ' +
+    'jede Art der Verwertung außerhalb der Grenzen des ' +
+    'Urheberrechts bedürfen der schriftlichen Zustimmung des ' +
+    'jeweiligen Autors bzw. Erstellers.</p>' +
+
+    '<h3>Datenschutzerklärung (DSGVO)</h3>' +
+    '<p>Diese Anwendung ist ein im Browser laufendes Spiel und ' +
+    'verarbeitet personenbezogene Daten ausschließlich im Rahmen ' +
+    'der Highscore-Funktion:</p>' +
+    '<p><strong>Highscore-Eintrag:</strong> Bei einer freiwilligen ' +
+    'Eintragung wird der vom Spieler gewählte Name (max. 12 ' +
+    'Zeichen) zusammen mit der Punktzahl, dem Zeitpunkt der ' +
+    'Eintragung und Run-Statistiken (Anzahl überstandener ' +
+    'In-Game-Monate, verlorene Leben, Spielausgang) gespeichert. ' +
+    'Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO ' +
+    '(Einwilligung durch das aktive Absenden des Eintrags).</p>' +
+    '<p><strong>Anonyme Client-ID:</strong> Zur Begrenzung ' +
+    'automatisierter Mehrfacheintragungen wird beim ersten ' +
+    'Highscore-Eintrag eine zufällige UUID erzeugt und im Browser ' +
+    '(localStorage) abgelegt. Sie enthält keine personenbezogenen ' +
+    'Merkmale und dient ausschließlich der Rate-Limit-Prüfung. ' +
+    'Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO ' +
+    '(berechtigtes Interesse an Missbrauchsschutz).</p>' +
+    '<p><strong>Keine Cookies, kein Tracking, keine Analytics.</strong> ' +
+    'Die Anwendung nutzt ausschließlich localStorage zur ' +
+    'Speicherung von Spieleinstellungen und der oben genannten ' +
+    'Client-ID; es werden keine Cookies gesetzt, keine Tracking- ' +
+    'oder Analyse-Dienste eingebunden und keine Daten an Dritte ' +
+    'weitergegeben (mit Ausnahme der Übertragung des ' +
+    'Highscore-Eintrags an den Highscore-Server).</p>' +
+    '<p><strong>Auskunft und Löschung:</strong> Auskunfts-, ' +
+    'Berichtigungs- und Löschanfragen bezüglich gespeicherter ' +
+    'Highscore-Einträge können über die im Impressum genannte ' +
+    'Kontaktadresse gestellt werden.</p>'
+  );
+}
+
+function openImprintDialog(){
+  if(!ovImprint || !_hasImprint) return;
+  if(ovImprintBody) ovImprintBody.innerHTML = renderImprintHTML(window.WEB_IMPRINT);
+  ovImprint.classList.remove('hidden');
+}
+function closeImprintDialog(){
+  if(ovImprint) ovImprint.classList.add('hidden');
+}
+
+if(_hasImprint){
+  if(rImprintStart) rImprintStart.style.display = '';
+  if(rImprintPanel) rImprintPanel.style.display = '';
+  if(bImprintStart) bImprintStart.addEventListener('click', (e) => {
+    e.preventDefault(); openImprintDialog();
+  });
+  if(bImprintPanel) bImprintPanel.addEventListener('click', (e) => {
+    e.preventDefault(); openImprintDialog();
+  });
+}
+if(ovImprintClose) ovImprintClose.addEventListener('click', closeImprintDialog);
+if(ovImprint){
+  // Click on the dim backdrop (but not on the card) closes the dialog.
+  ovImprint.addEventListener('click', (e) => {
+    if(e.target === ovImprint) closeImprintDialog();
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape' && ovImprint && !ovImprint.classList.contains('hidden')){
+    closeImprintDialog();
+  }
+});
+
 const tFruits = document.getElementById('t-fruits');
 const lFruits = document.getElementById('l-fruits');
 let fruitsMode = true;

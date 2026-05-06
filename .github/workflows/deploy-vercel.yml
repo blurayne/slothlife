@@ -78,10 +78,11 @@ jobs:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
         run: npx convex deploy --yes
 
-      - name: Stamp version.js + backend-config.js + cache-bust HTML
+      - name: Stamp version.js + backend-config.js + imprint.js + cache-bust HTML
         if: steps.gate.outputs.skip_vercel == 'false'
         env:
-          CONVEX_URL: ${{ secrets.CONVEX_URL }}
+          CONVEX_URL:  ${{ secrets.CONVEX_URL }}
+          WEB_IMPRINT: ${{ secrets.WEB_IMPRINT }}
         run: |
           set -euo pipefail
           {
@@ -95,12 +96,24 @@ jobs:
             echo "// Stamped by .github/workflows/deploy-vercel.yml at deploy time."
             echo "window.CONVEX_URL = '${CONVEX_URL:-}';"
           } > assets/backend-config.js
+          # Multiline-safe write for WEB_IMPRINT — node's JSON.stringify
+          # handles newlines, quotes, and backslashes that `echo` would
+          # mangle. Empty secret = empty string = Impressum links stay
+          # hidden via main.js's _hasImprint guard.
+          node -e "require('fs').writeFileSync(
+            'assets/imprint.js',
+            'window.WEB_IMPRINT = ' +
+            JSON.stringify(process.env.WEB_IMPRINT || '') + ';\n'
+          )"
           sed -i \
             -e "s/?v=dev/?v=${{ github.sha }}/g" \
             -e "s/name=\"app-version\" content=\"dev\"/name=\"app-version\" content=\"${{ github.sha }}\"/" \
             index.html
           echo "--- assets/version.js ---";        cat assets/version.js
           echo "--- assets/backend-config.js ---"; cat assets/backend-config.js
+          # First 200 chars only — keeps long addresses out of public CI logs.
+          echo "--- assets/imprint.js (first 200 chars) ---"
+          head -c 200 assets/imprint.js; echo
 
       - name: Pull Vercel project settings
         if: steps.gate.outputs.skip_vercel == 'false'

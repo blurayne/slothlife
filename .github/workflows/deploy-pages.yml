@@ -64,6 +64,25 @@ jobs:
             echo "::error::version.js still has APP_SHA='unknown' — stamp failed"
             exit 1
           fi
+      - name: Stamp WEB_IMPRINT into assets/imprint.js
+        env:
+          WEB_IMPRINT: ${{ secrets.WEB_IMPRINT }}
+        run: |
+          set -euo pipefail
+          # Multiline-safe write: node's JSON.stringify handles newlines,
+          # quotes, and backslashes that `echo` would mangle. Empty
+          # secret → empty string → main.js's _hasImprint guard hides
+          # every Impressum link and never opens the dialog.
+          node -e "require('fs').writeFileSync(
+            'assets/imprint.js',
+            'window.WEB_IMPRINT = ' +
+            JSON.stringify(process.env.WEB_IMPRINT || '') + ';\n'
+          )"
+          # Diagnostic: log the first 200 chars of the generated file
+          # (truncated so a long address doesn't bloat the public CI
+          # log; enough to confirm the stamp ran correctly).
+          echo "--- assets/imprint.js (first 200 chars) ---"
+          head -c 200 assets/imprint.js; echo
       - name: Cache-bust HTML asset URLs
         run: |
           set -euo pipefail
