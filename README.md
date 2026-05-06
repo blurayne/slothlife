@@ -228,11 +228,59 @@ page from a hostname that includes `vercel` (or temporarily relax the
 
 
 
+## Licence
+
+This project is licensed under the **GNU General Public License
+v3.0** (GPL-3.0-or-later). See [`LICENSE`](LICENSE) for the full
+text. In short: you can use, study, modify, and redistribute the
+code, including commercially, *as long as derivative works are
+distributed under the same licence and ship their source*.
+
+Copyright © blurayne and contributors.
+
 ## Credits
 
-- Background music *Mossy Perch* generated with [suno.com][1].
-- Snore sample sourced from Epidemic Sound.
-- Thunder sample is a freely-licensed field recording.
-- Everything else (engine, art, code) is original to this repo.
+### Audio
 
-[1]: https://suno.com/
+All five music tracks are generated with [suno.com][suno] and
+shipped with this repo:
+
+- *Mossy Perch* — `assets/audio/mossy-perch.mp3`
+- *Super Sloth Bros Chill* — `assets/audio/super-sloth-bros-chill.mp3`
+- *Selva Lenta* — `assets/audio/selva-lenta.mp3`
+- *Selva Lenta II* — `assets/audio/selva-lenta-ii.mp3`
+- *Canopy Drift* — `assets/audio/canopy-drift.mp3`
+
+The two SFX (`assets/audio/snore.mp3`, `assets/audio/thunder.mp3`)
+are likewise generated with suno.com.
+
+### Code, art, and tooling
+
+- Engine, gameplay logic, art (`assets/favicon.svg`), and CSS are
+  original to this repo, GPL-3.0-or-later.
+- The icon PNGs under `icons/` are rendered from `assets/favicon.svg`
+  by `.github/workflows/deploy-pages.yml` at deploy time — they
+  inherit the same licence as the SVG source.
+
+### Third-party software
+
+Used at build time via `package.json` `devDependencies`:
+
+| Package | Version | Licence |
+|---|---|---|
+| [`@bubblewrap/cli`](https://github.com/GoogleChromeLabs/bubblewrap) | ^1.23.0 | Apache-2.0 |
+| [`convex`](https://github.com/get-convex/convex-backend) | ^1.16.0 | Apache-2.0 |
+| [`typescript`](https://github.com/microsoft/TypeScript) | ^5.4.0 | Apache-2.0 |
+
+Loaded at runtime by the frontend (only when the Vercel/Convex
+deployment is active — the GitHub Pages build never imports it):
+
+| Module | Version | Licence |
+|---|---|---|
+| [`convex/browser`](https://github.com/get-convex/convex-backend) (from esm.sh) | 1.16.0 | Apache-2.0 |
+
+Apache-2.0 is GPL-3-compatible (one-way: GPL-3 code may include
+Apache-2-licensed code, and the result is GPL-3 as a whole), so
+the combined work is distributable under GPL-3.0-or-later.
+
+[suno]: https://suno.com/

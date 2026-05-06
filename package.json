@@ -2,6 +2,7 @@
   "name": "slothlife",
   "version": "0.0.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "description": "Sloth's Life — a windy-tree browser game. Static frontend (no build) + optional Convex backend for shared highscores when deployed to Vercel.",
   "scripts": {
     "convex:dev":    "convex dev",
