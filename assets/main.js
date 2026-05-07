@@ -2905,13 +2905,24 @@ class Sloth{
     // t=1 the limb releases; if all four release, _updateBodyPhysics
     // sees nGrip=0 and the next tick's _beginFall() handles the
     // terminal fall, so no extra fall code is needed here.
+    //
+    // We pin limb.t to 1.0 on release (so the limb's last-known
+    // position is well-defined as the branch tip) but DO NOT null
+    // limb.branch — _beginActiveReach (:3100) and _beginTransition
+    // (:3187) both call getBranchPt(limb.branch, limb.t) without a
+    // null guard to record reachStart for limbs that startReach
+    // selects by distance, regardless of gripped state. Keeping the
+    // stale-but-valid branch reference means those lookups return
+    // the actual last-known hand position (the tip) instead of
+    // throwing, which was freezing the rAF chain when the player
+    // tapped to swing after a slip.
     if(this.state === 'HANGING'){
       for(const limb of this.limbs){
         if(!limb.gripped || !limb.branch || !limb.branch.icy) continue;
         limb.t += ICY_SLIP_RATE * dt;
         if(limb.t >= 1.0){
+          limb.t       = 1.0;
           limb.gripped = false;
-          limb.branch  = null;
         }
       }
     }
