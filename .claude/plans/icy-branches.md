@@ -184,6 +184,24 @@ threatening enough, bump to 0.05 (10 s).
   at night). The trigger conditions can be extended to include
   `sun.opacity` later if needed.
 
+## Follow-up: cold-rain trigger removed
+
+User decided that rain alone shouldn't freeze branches.
+The `inColdRain` branch in `_updateBranchIcing()`, plus
+`ICY_PROB_RAIN`, `ICY_RAIN_THRESH`, and `ICY_COLD_THRESH`
+constants, were removed. The `'cold-rain'` mode value is
+gone from `_icyFreezeMode`. Icing now only fires in:
+
+- **Calendar-cold (Jan-Feb)** — `info.day < 2`, the natural
+  trigger.
+- **Dev FORCE ICY toggle** — debug-only override at
+  `ICY_PROB_FORCE = 0.90`.
+
+The slip mechanic, render overlay, and tuning constants
+(`ICY_PROB_WINTER`, `ICY_SLIP_RATE`) all stay. The render-
+loop fix from `116f995` (don't null `limb.branch` on slip;
+pin `limb.t = 1.0`) also stays.
+
 ## Shipped
 
 - `cfd6fd8` — feat: icy branches in Jan-Feb and during cold

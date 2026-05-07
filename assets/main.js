@@ -2240,18 +2240,16 @@ const HUNGER_LEAF_GAIN    = 0.01;
 const HUNGER_APPLE_GAIN   = 0.10;
 
 // ── ICY BRANCHES ────────────────────────────────────────
-// In Jan-Feb, or during heavy rain in cold-ish weather, a fraction
-// of deep branches becomes "icy". A gripped limb on an icy branch
-// slowly slips toward the tip (limb.t drifts +); past t=1 the limb
-// releases. If all four limbs release the existing nGrip===0 path
-// fires _beginFall() — no extra fall code needed. SLIP_RATE=0.025
-// gives a limb at t=0.5 ~20 s before slipping off, plenty of time
-// to swing away.
+// In Jan-Feb, a fraction of deep branches becomes "icy". A
+// gripped limb on an icy branch slowly slips toward the tip
+// (limb.t drifts +); past t=1 the limb releases. If all four
+// limbs release the existing nGrip===0 path fires _beginFall()
+// — no extra fall code needed. SLIP_RATE=0.025 gives a limb at
+// t=0.5 ~20 s before slipping off, plenty of time to swing
+// away. The dev-only FORCE ICY toggle can also engage icing
+// on demand regardless of season.
 const ICY_PROB_WINTER = 0.30;
-const ICY_PROB_RAIN   = 0.15;
 const ICY_PROB_FORCE  = 0.90;   // dev-only "FORCE ICY" toggle override
-const ICY_RAIN_THRESH = 0.30;   // rainIntensity to engage cold-rain icing
-const ICY_COLD_THRESH = 0.30;   // winterness floor for cold-rain icing
 const ICY_SLIP_RATE   = 0.025;  // limb.t per second on an icy branch
 // Trunk has its own (very stiff) spring — bends gently under heavy gusts.
 // The trunk top's swayed position becomes the parent anchor for primary
@@ -4282,26 +4280,24 @@ function spawnFruits(){
 // Sloth._updateBodyPhysics and the icy-overlay draw in
 // Branch.draw.
 let _icyFreezeEpoch = 0;     // bumps every time the freeze state changes
-let _icyFreezeMode  = 'none'; // 'winter' | 'cold-rain' | 'none'
+let _icyFreezeMode  = 'none'; // 'force' | 'winter' | 'none'
 function _updateBranchIcing(){
   const info = getSeasonInfo(seasonTime);
   const inWinterBand = info.day < 2;            // Jan-Feb
-  const inColdRain   = rainIntensity > ICY_RAIN_THRESH &&
-                       info.winterness > ICY_COLD_THRESH;
-  // Dev-only FORCE ICY toggle wins over the natural triggers so
-  // the slip mechanic can be tested without setting up cold
-  // weather. Order: force > winter > cold-rain > none.
+  // Dev-only FORCE ICY toggle wins over the natural winter
+  // trigger so the slip mechanic can be tested without setting
+  // up cold weather. Order: force > winter > none. Cold-rain
+  // icing was removed per user request — rain alone shouldn't
+  // freeze branches; only deep winter (or the dev override).
   const newMode =
-    icyForce     ? 'force'     :
-    inWinterBand ? 'winter'    :
-    inColdRain   ? 'cold-rain' :
+    icyForce     ? 'force'  :
+    inWinterBand ? 'winter' :
                    'none';
   if(newMode === _icyFreezeMode) return;
   _icyFreezeMode = newMode;
   _icyFreezeEpoch++;
-  const prob = newMode === 'force'     ? ICY_PROB_FORCE  :
-               newMode === 'winter'    ? ICY_PROB_WINTER :
-               newMode === 'cold-rain' ? ICY_PROB_RAIN   : 0;
+  const prob = newMode === 'force'  ? ICY_PROB_FORCE  :
+               newMode === 'winter' ? ICY_PROB_WINTER : 0;
   for(const b of allBranches()){
     b.icyEpoch = _icyFreezeEpoch;
     if(prob === 0){
