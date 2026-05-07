@@ -143,7 +143,7 @@
      same .20em tracking pushes the panel wider than the slider
      rows beneath it. Tighten by 25 % only for the dev title;
      the player-mode "SETTINGS" keeps the original spacing. */
-  .ptitle.dev-only{ letter-spacing:.15em; }
+  .ptitle.dev-only{ letter-spacing:.11em; }
   .pversion{
     font-size:9px;
     color:rgba(255,255,255,.40);

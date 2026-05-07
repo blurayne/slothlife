@@ -202,7 +202,7 @@
   <!-- Title swaps based on dev-mode. Both elements live in the DOM
        at all times; CSS picks whichever matches the current mode
        (.player-only is the inverse of .dev-only). -->
-  <div class="ptitle player-only">SETTINGS</div>
+  <div class="ptitle player-only">GAME SETTINGS</div>
   <div class="ptitle dev-only">DEVELOPER SETTINGS</div>
   <!-- Env + version row — dev mode only; in player mode the same
        string appears as the first segment of the bottom footer. -->
@@ -340,12 +340,6 @@
     <input type="range" id="s-reachTime" min="0.3" max="3" step="0.1" value="2">
     <span class="pval" id="v-reachTime">2.0</span></div>
 
-  <!-- Symmetric counterpart to the long-press dev-mode entry: a
-       button that drops dev mode + clears the localStorage flag.
-       Visible only inside the .dev-only block (i.e. only while in
-       dev mode), so the player view never shows it. -->
-  <div class="prow" style="margin-top:14px"><span class="pname"></span>
-    <button id="b-lock-dev" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">EXIT DEV MODE</button></div>
   </div><!-- /.dev-only -->
 
   <!-- PWA install entry — hidden by default, only revealed once
@@ -356,15 +350,20 @@
   <div class="prow" id="r-install" style="display:none"><span class="pname"></span>
     <button id="b-install" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">INSTALL APP</button></div>
 
-  <!-- Bottom-of-panel action — split by mode so exactly one button
-       shows up at a time:
-       * Dev mode → RESET: hard cache-clear + reload (b-refresh).
-         Useful when iterating on assets that the SW has pinned.
-       * Player mode → RESTART: re-rolls the tree + scene
-         (b-restart). The destructive action lives here for
-         players; devs get the cache-clear instead. -->
+  <!-- Bottom-of-panel actions — split by mode so the right buttons
+       show up at a time:
+       * Dev mode → CACHE BUSTER (b-refresh): hard cache-clear +
+         reload, useful when iterating on assets that the SW has
+         pinned. Followed by EXIT DEV MODE (b-lock-dev), the
+         symmetric counterpart to the long-press dev-mode entry —
+         drops dev mode + clears the localStorage flag.
+       * Player mode → RESTART (b-restart): re-rolls the tree +
+         scene. The destructive action lives here for players;
+         devs get the cache-clear + exit pair instead. -->
   <div class="prow dev-only" style="margin-top:18px"><span class="pname"></span>
-    <button id="b-refresh" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RESET</button></div>
+    <button id="b-refresh" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">CACHE BUSTER</button></div>
+  <div class="prow dev-only" style="margin-top:6px"><span class="pname"></span>
+    <button id="b-lock-dev" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">EXIT DEV MODE</button></div>
   <div class="prow player-only" style="margin-top:18px"><span class="pname"></span>
     <button id="b-restart" style="background:#1a1a1a;color:#cfa45a;border:1px solid #555;padding:5px 14px;font:bold 12px 'Courier New',monospace;cursor:pointer;letter-spacing:1px;">RESTART</button></div>
 

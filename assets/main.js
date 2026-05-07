@@ -7258,9 +7258,9 @@ function frame(ts){
     ctx.font = 'bold 14px "Courier New", monospace';
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.strokeText('Press Space or tap the clock to resume', cx, cy + 28);
+    ctx.strokeText('tap space or top area to resume', cx, cy + 28);
     ctx.fillStyle = 'rgba(220, 235, 255, 0.95)';
-    ctx.fillText('Press Space or tap the clock to resume', cx, cy + 28);
+    ctx.fillText('tap space or top area to resume', cx, cy + 28);
     ctx.restore();
   }
   requestAnimationFrame(frame);
