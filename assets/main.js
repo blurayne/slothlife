@@ -111,9 +111,9 @@ sliderDefs.forEach(({id,fmt,rebuild,respawnFruits,onChange})=>{
 });
 
 // ════════════════════════════════════════════════════════
-//  PANEL TOGGLE  (menu icon, bottom-right; panel slides in/out)
-//  ─ Tap the menu icon to open/close the panel.
-//  ─ Tap-and-hold the menu icon for ~2.5s to toggle developer mode.
+//  PANEL TOGGLE  (gear icon, bottom-right; panel slides in/out)
+//  ─ Tap the gear to open/close the panel.
+//  ─ Tap-and-hold the gear for ~2.5s to toggle developer mode.
 //    Player mode (.locked) hides the .dev-only sections so a
 //    normal player only sees PIXELIZE / BACKGROUND / TRACK / volumes.
 //    The flag persists in localStorage as 'sloth-devmode'.
@@ -137,7 +137,7 @@ function applyPanelState(){
 }
 
 // Long-press detection: pointerdown starts a rAF loop that ticks
-// the `--hold` CSS var (0..1) on the menu icon. After DEVMODE_HOLD_MS
+// the `--hold` CSS var (0..1) on the gear. After DEVMODE_HOLD_MS
 // the dev-mode flag flips. Movement > 12 px or pointerup before
 // threshold cancels.
 //
@@ -248,7 +248,7 @@ icSettings.addEventListener('click', (e) => {
   panelOpen = !panelOpen;
   applyPanelState();
 });
-// Tap anywhere outside the panel (and outside the menu icon) to close it.
+// Tap anywhere outside the panel (and outside the gear button) to close it.
 document.addEventListener('click', (e)=>{
   if(!panelOpen) return;
   if(panel.contains(e.target)) return;
