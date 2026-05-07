@@ -281,6 +281,11 @@
   <div class="prow"><span class="pname">RAIN INTENSITY</span>
     <input type="range" id="s-rain" min="0" max="1" step="0.01" value="0">
     <span class="pval" id="v-rain">0.00</span></div>
+  <!-- Dev-only force-icy toggle. ON → 90 % of deep branches are
+       icy regardless of season / rain, for testing the slip
+       mechanic without setting up cold weather conditions. -->
+  <div class="ptog-row"><span class="pname">FORCE ICY</span>
+    <div class="tog" id="t-icy-force"></div><span class="tlbl" id="l-icy-force">OFF</span></div>
   <div class="prow"><span class="pname">MONTH</span>
     <input type="range" id="s-month" min="0" max="11.99" step="0.05" value="3">
     <span class="pval" id="v-month">APR</span></div>

@@ -1507,6 +1507,25 @@ if(sRain){
   });
 }
 
+// FORCE ICY toggle (dev-only) — forces ~90% of deep branches
+// to be icy regardless of season / rain. Lets a dev test the
+// slip mechanic without manually setting up cold weather.
+// _updateBranchIcing detects the mode flip on the next frame
+// and re-rolls all branches via the existing epoch mechanism.
+const tIcyForce = document.getElementById('t-icy-force');
+const lIcyForce = document.getElementById('l-icy-force');
+let icyForce = false;
+function applyIcyForce(){
+  if(tIcyForce) tIcyForce.classList.toggle('on', icyForce);
+  if(lIcyForce) lIcyForce.textContent = icyForce ? 'ON' : 'OFF';
+}
+if(tIcyForce){
+  tIcyForce.addEventListener('click', () => {
+    icyForce = !icyForce;
+    applyIcyForce();
+  });
+}
+
 // TIME LEFT toggle — swaps the bottom-left HUD between the WIND
 // strength bar (#hud) and the estimated real-world time remaining
 // (#timeleft). Defaults OFF so first-time visitors see the original
@@ -2230,6 +2249,7 @@ const HUNGER_APPLE_GAIN   = 0.10;
 // to swing away.
 const ICY_PROB_WINTER = 0.30;
 const ICY_PROB_RAIN   = 0.15;
+const ICY_PROB_FORCE  = 0.90;   // dev-only "FORCE ICY" toggle override
 const ICY_RAIN_THRESH = 0.30;   // rainIntensity to engage cold-rain icing
 const ICY_COLD_THRESH = 0.30;   // winterness floor for cold-rain icing
 const ICY_SLIP_RATE   = 0.025;  // limb.t per second on an icy branch
@@ -4257,14 +4277,19 @@ function _updateBranchIcing(){
   const inWinterBand = info.day < 2;            // Jan-Feb
   const inColdRain   = rainIntensity > ICY_RAIN_THRESH &&
                        info.winterness > ICY_COLD_THRESH;
+  // Dev-only FORCE ICY toggle wins over the natural triggers so
+  // the slip mechanic can be tested without setting up cold
+  // weather. Order: force > winter > cold-rain > none.
   const newMode =
+    icyForce     ? 'force'     :
     inWinterBand ? 'winter'    :
     inColdRain   ? 'cold-rain' :
                    'none';
   if(newMode === _icyFreezeMode) return;
   _icyFreezeMode = newMode;
   _icyFreezeEpoch++;
-  const prob = newMode === 'winter'    ? ICY_PROB_WINTER :
+  const prob = newMode === 'force'     ? ICY_PROB_FORCE  :
+               newMode === 'winter'    ? ICY_PROB_WINTER :
                newMode === 'cold-rain' ? ICY_PROB_RAIN   : 0;
   for(const b of allBranches()){
     b.icyEpoch = _icyFreezeEpoch;
