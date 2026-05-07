@@ -4476,12 +4476,18 @@ canvas.addEventListener('pointerdown', e=>{
   if(gameState !== 'PLAYING') return;
   const {x: cx, y: cy} = getCanvasXY(e);
   activePointers.set(e.pointerId, { x: cx, y: cy });
-  // Pause-toggle: tap on the clock face in the top HUD. Use a generous
-  // hit radius (1.8× clock radius) so it's easy to hit with a fingertip.
+  // Pause-toggle: tap anywhere inside the top HUD band — the
+  // band runs full-width across the top, ending just below the
+  // clock / icon row. The clock is the visual cue but the
+  // entire band is the hit target, so it's easy to find with a
+  // fingertip on phones (no aiming at the small clock face).
+  // Only fires when this is the sole active pointer so a pinch
+  // gesture starting in the top of the canvas doesn't toggle
+  // pause on the way to the second finger landing.
   if(!gameOver && activePointers.size === 1){
     const r = _hudBarsRect();
-    const dx = cx - r.clockX, dy = cy - r.clockY;
-    if(dx*dx + dy*dy <= (r.clockR * 1.8) * (r.clockR * 1.8)){
+    const topBarBottom = r.clockY + r.clockR + 6;
+    if(cy < topBarBottom){
       activePointers.delete(e.pointerId);
       togglePause();
       return;
