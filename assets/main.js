@@ -1698,6 +1698,11 @@ class Branch {
     this.autumnSnapCount = -1;      // snapshot at autumn start, -1 = not snapped
     this.autumnShedDone = false;
     this.springGrewDone = false;
+    // Icy bookkeeping — see _updateBranchIcing. icy = current freeze
+    // state; icyEpoch tracks which freeze cycle we last rolled for so
+    // we don't re-randomise per frame.
+    this.icy      = false;
+    this.icyEpoch = -1;
   }
   update(sx,sy,parentTang,inheritedSway,dt){
     // Sloth's weight bends the branch it's gripping (proportional to position
@@ -1789,6 +1794,27 @@ class Branch {
     ctx.lineWidth=Math.max(this.thick,0.5);
     ctx.lineCap='round';
     ctx.stroke();
+    // Icy overlay: pale-blue gradient hugging the upper edge. Vertical
+    // linear gradient from above the branch's bounding box to below;
+    // the upper-edge of the round-cap stroke picks up the high-alpha
+    // stop, the bottom fades to transparent. Reads as frost on the
+    // top of the branch, not a uniform paint job.
+    if(this.icy){
+      const tk   = Math.max(this.thick, 0.5);
+      const minY = Math.min(this.sy, this.ey, this.p1y, this.p2y) - tk;
+      const maxY = Math.max(this.sy, this.ey, this.p1y, this.p2y) + tk;
+      const grad = ctx.createLinearGradient(0, minY, 0, maxY);
+      grad.addColorStop(0,    'rgba(200, 230, 250, 0.75)');
+      grad.addColorStop(0.4,  'rgba(200, 230, 250, 0.30)');
+      grad.addColorStop(1,    'rgba(200, 230, 250, 0)');
+      ctx.beginPath();
+      ctx.moveTo(this.sx, this.sy);
+      ctx.bezierCurveTo(this.p1x, this.p1y, this.p2x, this.p2y, this.ex, this.ey);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth   = tk;
+      ctx.lineCap     = 'round';
+      ctx.stroke();
+    }
     for(const c of this.children) c.draw();
     if(this.depth>=4 && this.leafSeed.length) this._drawLeaves();
   }
@@ -2163,6 +2189,20 @@ const HUNGER_DECAY_AWAKE  = 1 / 120;
 const HUNGER_DECAY_ASLEEP = HUNGER_DECAY_AWAKE * 0.18;
 const HUNGER_LEAF_GAIN    = 0.01;
 const HUNGER_APPLE_GAIN   = 0.10;
+
+// ── ICY BRANCHES ────────────────────────────────────────
+// In Jan-Feb, or during heavy rain in cold-ish weather, a fraction
+// of deep branches becomes "icy". A gripped limb on an icy branch
+// slowly slips toward the tip (limb.t drifts +); past t=1 the limb
+// releases. If all four limbs release the existing nGrip===0 path
+// fires _beginFall() — no extra fall code needed. SLIP_RATE=0.025
+// gives a limb at t=0.5 ~20 s before slipping off, plenty of time
+// to swing away.
+const ICY_PROB_WINTER = 0.30;
+const ICY_PROB_RAIN   = 0.15;
+const ICY_RAIN_THRESH = 0.55;   // rainIntensity to engage cold-rain icing
+const ICY_COLD_THRESH = 0.30;   // winterness floor for cold-rain icing
+const ICY_SLIP_RATE   = 0.025;  // limb.t per second on an icy branch
 // Trunk has its own (very stiff) spring — bends gently under heavy gusts.
 // The trunk top's swayed position becomes the parent anchor for primary
 // branches, and its angle propagates as inheritedSway so the entire tree
@@ -2189,6 +2229,10 @@ function buildTree(){
   if(fruitsMode) spawnFruits();
   // re-roll the scattered dead stumps so they shuffle alongside the tree
   makeDeadTrunks();
+  // Force the next _updateBranchIcing() pass to re-roll: the new
+  // branches all have icy=false and icyEpoch=-1, so without nudging
+  // the mode flag they'd stay ice-free until the next cycle change.
+  _icyFreezeMode = 'pending-rebuild';
 }
 // Recompute everything that depends on canvas dimensions but DON'T
 // reshuffle the random background theme. Called both on initial load
@@ -2801,6 +2845,23 @@ class Sloth{
             this.bodyVx -= vDotN * nx;
             this.bodyVy -= vDotN * ny;
           }
+        }
+      }
+    }
+
+    // Icy slip — limbs gripped on a flagged-icy branch drift toward
+    // the tip. Only fires while HANGING (sleeping shouldn't slip you
+    // unwarned; reach / transition / eat anims need stable t). Past
+    // t=1 the limb releases; if all four release, _updateBodyPhysics
+    // sees nGrip=0 and the next tick's _beginFall() handles the
+    // terminal fall, so no extra fall code is needed here.
+    if(this.state === 'HANGING'){
+      for(const limb of this.limbs){
+        if(!limb.gripped || !limb.branch || !limb.branch.icy) continue;
+        limb.t += ICY_SLIP_RATE * dt;
+        if(limb.t >= 1.0){
+          limb.gripped = false;
+          limb.branch  = null;
         }
       }
     }
@@ -4148,6 +4209,43 @@ function spawnFruits(){
       fruits.push(new Fruit(b, t, drop));
     }
   });
+}
+
+// ── BRANCH ICING ────────────────────────────────────
+// Sets / clears each branch's `.icy` flag based on the current
+// freeze cycle: deep winter (Jan-Feb) or heavy rain in cold-ish
+// weather. The helper is cheap in steady state — it tracks the
+// freeze cycle via two epoch counters and only walks the branch
+// list when the cycle transitions (freeze begins, freeze ends,
+// rain switches modes). Ties into the slip code in
+// Sloth._updateBodyPhysics and the icy-overlay draw in
+// Branch.draw.
+let _icyFreezeEpoch = 0;     // bumps every time the freeze state changes
+let _icyFreezeMode  = 'none'; // 'winter' | 'cold-rain' | 'none'
+function _updateBranchIcing(){
+  const info = getSeasonInfo(seasonTime);
+  const inWinterBand = info.day < 2;            // Jan-Feb
+  const inColdRain   = rainIntensity > ICY_RAIN_THRESH &&
+                       info.winterness > ICY_COLD_THRESH;
+  const newMode =
+    inWinterBand ? 'winter'    :
+    inColdRain   ? 'cold-rain' :
+                   'none';
+  if(newMode === _icyFreezeMode) return;
+  _icyFreezeMode = newMode;
+  _icyFreezeEpoch++;
+  const prob = newMode === 'winter'    ? ICY_PROB_WINTER :
+               newMode === 'cold-rain' ? ICY_PROB_RAIN   : 0;
+  for(const b of allBranches()){
+    b.icyEpoch = _icyFreezeEpoch;
+    if(prob === 0){
+      b.icy = false;
+    } else {
+      // Only deeper branches ice over — trunk + primary forks stay
+      // clean. Same depth gating as the apple/leaf systems.
+      b.icy = (b.depth >= 2) && (Math.random() < prob);
+    }
+  }
 }
 
 // ── SEASON APPLES ───────────────────────────────────
@@ -7031,6 +7129,7 @@ function frame(ts){
     }
     _updateSeasonLeaves(dt);
     _updateSeasonApples(dt);
+    _updateBranchIcing();
   }
 
   // Day/night cycle — auto-advance, sync slider when in auto mode

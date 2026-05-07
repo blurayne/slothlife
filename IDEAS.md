@@ -119,19 +119,6 @@ in-game day. Reuses the existing rain-end timer in
 
 ## Weather and hazards
 
-### Icy branches in winter
-
-In January / February, a low chance per branch to be
-"icy" — the sloth's grip on an icy branch slowly slips
-(positive `t` drift toward the branch tip) until either
-the player swings to a new branch or the sloth falls off
-the end. Visually, an extra cool-blue gradient over the
-branch. No instant-fall — the slip is gradual so the
-player has time to react.
-
-Adds genuine winter pressure to a season that's currently
-visual-only.
-
 ### Heat wave and drought
 
 Mid-summer (July) gets a per-game roll for a heat wave:

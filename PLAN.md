@@ -14,6 +14,7 @@ _(none — see "Shipped this batch" below.)_
 
 ## Shipped this batch
 
+- [x] **Icy branches in winter + cold rain** — per-branch `.icy` flag rolled when Jan-Feb or `rainIntensity > 0.55 && winterness > 0.3`; gripped limb on an icy branch slowly drifts toward the tip, slips past the end → existing fall path; cool-blue gradient on the branch's upper edge — [plan](.claude/plans/icy-branches.md)
 - [x] **Deploy / build infrastructure: TWA.md + mise.toml + Containerfile + Helm chart** — multi-stage nginx Containerfile for serving the static app (with /healthz), docker-compose target for local production-like serve, Helm chart for k8s, mise tasks mirroring `build-android.yml` for local TWA builds, and TWA.md guide — [plan](.claude/plans/twa-md-and-deploy-infrastructure.md)
 - [x] **Highscore name cap 8 → 12 + live code-point-aware input cap** — fixes the visible-vs-saved-name disagreement caused by HTML `maxlength` counting UTF-16 units while every JS sanitiser counts code points — [plan](.claude/plans/highscore-name-cap-12-and-input-fix.md)
 - [x] **`GAMEPLAY.md` — strategy & stats field guide** — survival math, month-by-month strategy, scoring breakdown, win-chance chapter — [plan](.claude/plans/gameplay-md-strategy-guide.md)
