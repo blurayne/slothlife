@@ -475,7 +475,10 @@ function _restartToStart(){
   panVelX = 0; panVelY = 0;
   pinch = null;
   activePointers.clear();
-  showStart();
+  // Came here via the MAIN MENU button (from settings / name-entry
+  // dialog) — flag it so the start screen's button reads
+  // "RESTART GAME" instead of the default "START GAME".
+  showStart({ fromMainMenu: true });
 }
 
 // Settings-panel RESTART button.
@@ -6047,9 +6050,21 @@ let lastInsertedName = null;
 const ovStart = document.getElementById('ov-start');
 const ovName  = document.getElementById('ov-name');
 const ovEnd   = document.getElementById('ov-end');
+const ovStartBtn = document.getElementById('ov-start-btn');
 
-function showStart(){
+// Track whether the start screen is being shown after the
+// player explicitly hit MAIN MENU mid-run (vs. fresh-load /
+// post-game-over). Only the MAIN MENU path renames the
+// start button to "RESTART GAME"; everything else keeps the
+// canonical "START GAME" label.
+let _startCameViaMainMenu = false;
+
+function showStart(opts){
   gameState = 'START';
+  _startCameViaMainMenu = !!(opts && opts.fromMainMenu);
+  if(ovStartBtn){
+    ovStartBtn.textContent = _startCameViaMainMenu ? 'RESTART GAME' : 'START GAME';
+  }
   renderHighscoreTable('ov-start-hs', { limit: HS_MAX_BOARD });
   ovStart.classList.remove('hidden');
   ovName.classList.add('hidden');
@@ -6120,6 +6135,15 @@ function beginPlaying(){
 }
 
 document.getElementById('ov-start-btn').addEventListener('click', beginPlaying);
+// Click on the dim backdrop (but not on the card itself) is a
+// shortcut for the start button — mirrors the highscore /
+// imprint dialog backdrop-close pattern. Same effect whether
+// the screen is showing "START GAME" or "RESTART GAME".
+if(ovStart){
+  ovStart.addEventListener('click', (e) => {
+    if(e.target === ovStart) beginPlaying();
+  });
+}
 document.getElementById('ov-end-btn').addEventListener('click', () => {
   showStart();   // return to start screen between runs
 });
