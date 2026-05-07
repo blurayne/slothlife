@@ -134,11 +134,16 @@
   #panel:not(.locked) .player-only{ display:none; }
 
   .ptitle{
-    font-size:209%;letter-spacing:.08em;
+    font-size:209%;letter-spacing:.20em;
     color:#fff;
     margin-bottom:10px;padding-bottom:7px;
     border-bottom:1px solid rgba(255,255,255,.06);
   }
+  /* "DEVELOPER SETTINGS" is much longer than "SETTINGS" so the
+     same .20em tracking pushes the panel wider than the slider
+     rows beneath it. Tighten by 15 % only for the dev title;
+     the player-mode "SETTINGS" keeps the original spacing. */
+  .ptitle.dev-only{ letter-spacing:.17em; }
   .pversion{
     font-size:9px;
     color:rgba(255,255,255,.40);
