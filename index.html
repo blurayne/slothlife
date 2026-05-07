@@ -272,6 +272,15 @@
     <span class="pval" id="v-time">0.40</span></div>
   <div class="ptog-row"><span class="pname">RAIN</span>
     <div class="tog on" id="t-rain"></div><span class="tlbl" id="l-rain">ON</span></div>
+  <!-- Dev-only manual rain control. Toggle takes the rain off the
+       auto storm/dry cycle and hands the slider full control of
+       rainIntensity; with override OFF (default) the slider
+       passively mirrors the current intensity each frame. -->
+  <div class="ptog-row"><span class="pname">RAIN OVERRIDE</span>
+    <div class="tog" id="t-rain-override"></div><span class="tlbl" id="l-rain-override">OFF</span></div>
+  <div class="prow"><span class="pname">RAIN INTENSITY</span>
+    <input type="range" id="s-rain" min="0" max="1" step="0.01" value="0">
+    <span class="pval" id="v-rain">0.00</span></div>
   <div class="prow"><span class="pname">MONTH</span>
     <input type="range" id="s-month" min="0" max="11.99" step="0.05" value="3">
     <span class="pval" id="v-month">APR</span></div>

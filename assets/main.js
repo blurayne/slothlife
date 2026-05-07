@@ -1477,6 +1477,36 @@ function applyRain(){
 }
 tRain.addEventListener('click', ()=>{ rainMode = !rainMode; applyRain(); });
 
+// RAIN OVERRIDE (dev-only) — when ON, the slider drives
+// rainIntensity directly; the auto storm/dry cycle is bypassed.
+// When OFF (default) the auto cycle runs unchanged and the
+// slider passively mirrors the current intensity each frame so a
+// dev can watch the cycle without instrumenting the console.
+// Master rainMode still wins — rainMode OFF decays rain to 0
+// regardless of override.
+const tRainOverride = document.getElementById('t-rain-override');
+const lRainOverride = document.getElementById('l-rain-override');
+const sRain         = document.getElementById('s-rain');
+const vRain         = document.getElementById('v-rain');
+let rainOverride      = false;
+let rainOverrideValue = 0;
+function applyRainOverride(){
+  if(tRainOverride) tRainOverride.classList.toggle('on', rainOverride);
+  if(lRainOverride) lRainOverride.textContent = rainOverride ? 'ON' : 'OFF';
+}
+if(tRainOverride){
+  tRainOverride.addEventListener('click', () => {
+    rainOverride = !rainOverride;
+    applyRainOverride();
+  });
+}
+if(sRain){
+  sRain.addEventListener('input', () => {
+    rainOverrideValue = parseFloat(sRain.value);
+    if(vRain) vRain.textContent = rainOverrideValue.toFixed(2);
+  });
+}
+
 // TIME LEFT toggle — swaps the bottom-left HUD between the WIND
 // strength bar (#hud) and the estimated real-world time remaining
 // (#timeleft). Defaults OFF so first-time visitors see the original
@@ -2200,7 +2230,7 @@ const HUNGER_APPLE_GAIN   = 0.10;
 // to swing away.
 const ICY_PROB_WINTER = 0.30;
 const ICY_PROB_RAIN   = 0.15;
-const ICY_RAIN_THRESH = 0.55;   // rainIntensity to engage cold-rain icing
+const ICY_RAIN_THRESH = 0.30;   // rainIntensity to engage cold-rain icing
 const ICY_COLD_THRESH = 0.30;   // winterness floor for cold-rain icing
 const ICY_SLIP_RATE   = 0.025;  // limb.t per second on an icy branch
 // Trunk has its own (very stiff) spring — bends gently under heavy gusts.
@@ -5265,6 +5295,15 @@ function updateRain(dt){
   if(!rainMode){
     rainIntensity = Math.max(0, rainIntensity - dt*0.4);
     rainTargetIntensity = 0;
+  } else if(rainOverride){
+    // Dev-only manual control: snap straight to the slider's
+    // intent. Skip the timer + storm-thunder roll entirely so
+    // the cycle pauses while override is on. Reset rainTimer +
+    // rainHasThunder so a re-engaged auto cycle starts fresh.
+    rainIntensity       = rainOverrideValue;
+    rainTargetIntensity = rainOverrideValue;
+    rainTimer           = 14 + Math.random() * 22;
+    rainHasThunder      = false;
   } else {
     rainTimer -= dt;
     if(rainTimer <= 0){
@@ -7143,6 +7182,16 @@ function frame(ts){
   }
   // Rain
   updateRain(dt);
+  // Mirror live rainIntensity onto the dev RAIN INTENSITY slider
+  // when override is OFF. Lets a dev watch the auto cycle from
+  // the panel; also keeps rainOverrideValue in lockstep so
+  // toggling override ON doesn't snap rain to a stale value.
+  // Skip when override is ON — the slider is already the source.
+  if(!rainOverride){
+    if(sRain){ sRain.value = rainIntensity.toFixed(2); }
+    if(vRain){ vRain.textContent = rainIntensity.toFixed(2); }
+    rainOverrideValue = rainIntensity;
+  }
   updateLightning(dt);
 
   // Animate clouds: constant drift + a gentle wind nudge, wrap around screen.
