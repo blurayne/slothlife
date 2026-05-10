@@ -78,8 +78,9 @@ The page uses `fetch()` to load audio, which doesn't work over
     # then open http://localhost:8000/
 
 There is no build step — `index.html` loads `assets/styles.css`,
-`assets/main.js` and the seven MP3s in `assets/audio/`
-(five soundtracks plus the snore + thunder SFX) directly.
+`assets/main.js` and the 13 MP3s in `assets/audio/` (five
+soundtracks plus four thunder clips and four snore clips)
+directly.
 
 ## Layout
 
@@ -92,7 +93,7 @@ There is no build step — `index.html` loads `assets/styles.css`,
     assets/main.js          game (single ES file, no build)
     assets/version.js       build stamp (rewritten on each deploy)
     assets/backend-config.js CONVEX_URL stamp (rewritten on Vercel)
-    assets/audio/           five soundtrack mp3s + snore + thunder
+    assets/audio/           5 soundtrack mp3s + 4 thunder + 4 snore
     docs/screenshots/       readme preview shots (spring/autumn/winter)
     convex/                 TypeScript backend (schema + functions)
       schema.ts             highscore table definition
@@ -276,8 +277,20 @@ shipped with this repo:
 - *Selva Lenta II* — `assets/audio/selva-lenta-ii.mp3`
 - *Canopy Drift* — `assets/audio/canopy-drift.mp3`
 
-The two SFX (`assets/audio/snore.mp3`, `assets/audio/thunder.mp3`)
-are likewise generated with suno.com.
+The SFX layer ships eight short clips, four per category — the
+game picks a random clip per take so the same noise doesn't
+repeat:
+
+- `assets/audio/thunder-1.mp3` … `thunder-2.mp3` — distant-rumble
+  pool, played as ambience during heavy rain.
+- `assets/audio/thunder-3.mp3` … `thunder-4.mp3` — close-strike
+  pool, played when a lightning bolt is visible.
+- `assets/audio/snore-1.mp3` … `snore-4.mp3` — sloth-snore takes;
+  one is picked at random when the sleep loop first engages.
+
+These eight SFX were supplied by the repo owner under the
+project licence; they replace the earlier suno.com SFX which
+had a licensing constraint incompatible with redistribution.
 
 ### Code, art, and tooling
 
