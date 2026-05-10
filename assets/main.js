@@ -1039,7 +1039,7 @@ const Audio = {
     const g = this._rainNodes.master.gain;
     g.cancelScheduledValues(t);
     g.setValueAtTime(g.value, t);
-    g.linearRampToValueAtTime(v * 0.22, t + 0.20);
+    g.linearRampToValueAtTime(v * 0.187, t + 0.20);
   },
 
   // ── UI feedback: TARGET VALID — quick rising chirp (positive)
