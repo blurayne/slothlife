@@ -817,10 +817,12 @@ const Audio = {
     if(on){
       this.ensureCtx();
       if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
-      // Pre-warm the thunder sample so the first lightning strike (in
-      // particular the user-triggered kill-by-hold one) is audible
-      // instead of silently failing the "buffer not ready" guard.
-      this._ensureThunder();
+      // Pre-warm both thunder pools so the first lightning strike
+      // (in particular the user-triggered kill-by-hold one) AND the
+      // first heavy-rain rumble are audible instead of silently
+      // failing the "buffer not ready" guard.
+      this._ensureThunder('strike');
+      this._ensureThunder('rumble');
     } else if(this.gain && this.ctx){
       const t = this.ctx.currentTime;
       this.gain.gain.cancelScheduledValues(t);
@@ -916,13 +918,19 @@ const Audio = {
   // Snore audio: real recorded sample looped through a master gain.
   // The gain is driven by setSnoreLevel(v) from the Sloth class so the
   // cyclic fade-in / steady / fade-out / silence-gap behavior keeps
-  // working unchanged. Sample is decoded once on first need; before
-  // it's ready, level changes are stashed and applied on completion.
+  // working unchanged. A random one of four takes is picked on first
+  // decode for per-game-session variety; subsequent setSnoreLevel
+  // calls just modulate that buffer's gain.
   _snoreNodes: null,
   _snoreBuffer: null,
   _snoreLoading: false,
   _snorePending: null,    // last requested level while decode is in-flight
-  _snoreSampleUrl: 'assets/audio/snore.mp3',
+  _snoreSampleUrls: [
+    'assets/audio/snore-1.mp3',
+    'assets/audio/snore-2.mp3',
+    'assets/audio/snore-3.mp3',
+    'assets/audio/snore-4.mp3',
+  ],
   _ensureSnore(){
     if(!this.ctx || this._snoreNodes || this._snoreLoading) return;
     const ctx = this.ctx;
@@ -948,8 +956,11 @@ const Audio = {
     };
 
     this._snoreLoading = true;
-    // Fetch the snore sample → ArrayBuffer → AudioBuffer.
-    fetch(this._snoreSampleUrl + '?v=' + (window.APP_SHA || 'dev'))
+    // Pick a random take per game session for variety.
+    const url = this._snoreSampleUrls[
+      Math.floor(Math.random() * this._snoreSampleUrls.length)
+    ];
+    fetch(url + '?v=' + (window.APP_SHA || 'dev'))
       .then(r => {
         if(!r.ok) throw new Error('HTTP ' + r.status);
         return r.arrayBuffer();
@@ -1056,53 +1067,73 @@ const Audio = {
     o2.start(now); o2.stop(now + 0.18);
   },
 
-  // ── THUNDER — real recorded thunder strike sample, fetched as mp3.
-  // Decoded lazily on first need; subsequent calls reuse the cached
-  // AudioBuffer and play a fresh BufferSource with distance-scaled gain.
-  // A small distance-scaled lowpass filter softens far strikes so they
-  // sound muffled like real distant thunder.
-  _thunderBuffer: null,
-  _thunderLoading: false,
-  _thunderSampleUrl: 'assets/audio/thunder.mp3',
-  _ensureThunder(){
-    if(!this.ctx || this._thunderBuffer || this._thunderLoading) return;
-    const ctx = this.ctx;
-    this._thunderLoading = true;
-    fetch(this._thunderSampleUrl + '?v=' + (window.APP_SHA || 'dev'))
-      .then(r => {
-        if(!r.ok) throw new Error('HTTP ' + r.status);
-        return r.arrayBuffer();
-      })
-      .then(buf => ctx.decodeAudioData(buf))
-      .then(buffer => {
-        this._thunderBuffer = buffer;
-        this._thunderLoading = false;
-      })
-      .catch(err => {
-        console.warn('Thunder sample load failed:', err);
-        this._thunderLoading = false;
-      });
+  // ── THUNDER — two pools of recorded thunder samples.
+  // 'strike' (thunder-3, thunder-4) plays when a lightning bolt is
+  // visible — sharp, full-range cracks.
+  // 'rumble' (thunder-1, thunder-2) plays during heavy rain even
+  // without a visible strike — softer, distant rumbles for ambience.
+  // Both pools are decoded lazily on first need; subsequent calls
+  // reuse the cached AudioBuffers, picking a random take for variety.
+  _thunderPools: {
+    strike: ['assets/audio/thunder-3.mp3', 'assets/audio/thunder-4.mp3'],
+    rumble: ['assets/audio/thunder-1.mp3', 'assets/audio/thunder-2.mp3'],
   },
-  playThunder(distance){
+  _thunderBuffers: { strike: [], rumble: [] },
+  _thunderLoading: { strike: false, rumble: false },
+  _ensureThunder(kind){
+    if(!this.ctx) return;
+    const urls = this._thunderPools[kind];
+    if(!urls) return;
+    if(this._thunderBuffers[kind].length || this._thunderLoading[kind]) return;
+    const ctx = this.ctx;
+    this._thunderLoading[kind] = true;
+    Promise.all(urls.map(u =>
+      fetch(u + '?v=' + (window.APP_SHA || 'dev'))
+        .then(r => {
+          if(!r.ok) throw new Error('HTTP ' + r.status);
+          return r.arrayBuffer();
+        })
+        .then(buf => ctx.decodeAudioData(buf))
+    ))
+    .then(buffers => {
+      this._thunderBuffers[kind] = buffers;
+      this._thunderLoading[kind] = false;
+    })
+    .catch(err => {
+      console.warn('Thunder ' + kind + ' samples load failed:', err);
+      this._thunderLoading[kind] = false;
+    });
+  },
+  // Lightning-strike thunder: distance 0 = right above (loud, bright),
+  // 1 = far away (quieter, muffled). Picks a random clip from the
+  // 'strike' pool. Backwards-compat: a bare playThunder(distance)
+  // call still maps to a strike for callers that pre-date the kind
+  // argument.
+  playThunder(distance, kind = 'strike'){
     if(!this.enabled || !this.ctx) return;
-    this._ensureThunder();
-    if(!this._thunderBuffer) return;     // still decoding — skip this strike
+    this._ensureThunder(kind);
+    const buffers = this._thunderBuffers[kind];
+    if(!buffers || !buffers.length) return;     // still decoding — skip
     const ctx = this.ctx, now = ctx.currentTime;
+    const buffer = buffers[Math.floor(Math.random() * buffers.length)];
     const src = ctx.createBufferSource();
-    src.buffer = this._thunderBuffer;
-    // Distance: 0 = right above us (loud, full-range), 1 = far away
-    // (quieter, more muffled). Cap distance to [0, 1].
+    src.buffer = buffer;
     const d = Math.max(0, Math.min(1, distance));
-    const peak = Math.max(0.18, 0.95 - d * 0.55);
+    // Rumbles are quieter overall — they're meant to read as distant
+    // thunder behind the rain, not as "an actual strike just happened".
+    const baseScale = (kind === 'rumble') ? 0.55 : 1.0;
+    const peak = Math.max(0.12, (0.95 - d * 0.55) * baseScale);
     const g = ctx.createGain();
     g.gain.setValueAtTime(peak, now);
-    // Gentle late-tail fade so the sample's natural decay still ends silent
-    g.gain.setValueAtTime(peak, now + this._thunderBuffer.duration - 0.30);
-    g.gain.linearRampToValueAtTime(0.0001, now + this._thunderBuffer.duration);
-    // Distance-driven lowpass: closer strikes are bright, far ones dull.
+    g.gain.setValueAtTime(peak, now + buffer.duration - 0.30);
+    g.gain.linearRampToValueAtTime(0.0001, now + buffer.duration);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 18000 - d * 14000;   // 18 kHz close → 4 kHz far
+    // Rumbles are extra-muffled — start lower in the spectrum so the
+    // distance-driven cutoff lands them firmly in the low end.
+    const lpHi = (kind === 'rumble') ? 6500 : 18000;
+    const lpLo = (kind === 'rumble') ? 1500 : 4000;
+    lp.frequency.value = lpHi - d * (lpHi - lpLo);
     lp.Q.value = 0.7;
     src.connect(lp); lp.connect(g); g.connect(this._fxBus);
     src.start(now);
@@ -5314,6 +5345,7 @@ let rainIntensity = 0;
 let rainTargetIntensity = 0;
 let rainTimer = 25;             // start dry for 25s
 let rainHasThunder = false;     // randomly chosen at the start of each storm
+let _rumbleTimer = 12;          // distant-thunder rumble cadence (heavy-rain only)
 let snowFlakes = [];            // {x, y, vx, vy, r, sway, swayPhase, near}
 
 // Use the active "winterness" amount to decide whether precipitation
@@ -5352,6 +5384,26 @@ function updateRain(dt){
       }
     }
     rainIntensity += (rainTargetIntensity - rainIntensity) * dt * 0.5;
+  }
+
+  // Distant-thunder rumble cadence during heavy rain. Independent of
+  // the rainHasThunder lightning gate above — even a non-thundering
+  // storm can have ambient rumbles. Rate: one rumble every 8-22 s
+  // while rainIntensity > 0.55, gated on rain not being a winter
+  // snowstorm (rumbles read odd over snow). The Audio module
+  // resolves the actual clip + distance-driven gain/lowpass.
+  if(rainIntensity > 0.55 && _isSnowing() < 0.5 && !rainOverride){
+    _rumbleTimer -= dt;
+    if(_rumbleTimer <= 0){
+      // Distance 0.55-0.95 = clearly far away (most of these
+      // are ambient, not "right above us").
+      Audio.playThunder(0.55 + Math.random() * 0.40, 'rumble');
+      _rumbleTimer = 8 + Math.random() * 14;
+    }
+  } else {
+    // Outside heavy rain, keep the timer armed so the next storm
+    // doesn't immediately fire a rumble on its first heavy frame.
+    _rumbleTimer = 8 + Math.random() * 14;
   }
 
   const snowing = _isSnowing();
