@@ -554,6 +554,17 @@ let sunShadeMode = true;
 // the far left, +1 = sun on the far right, 0 = sun directly overhead
 // (or SUN SHADE off / raining / sun below the horizon).
 let _sunBias = 0;
+// 0 = the active directional light is the sun (warm highlights),
+// 1 = it's the moon (cool blue highlights, weaker bias). Set alongside
+// _sunBias in frame(); read by branch/trunk/sloth tinting.
+let _lightCool = 0;
+// Highlight target colour for the active light — warm sunlight
+// (235,200,140) lerped toward cool moonlight (165,190,235) by
+// _lightCool. Shared by branches, leaves and the sloth so the whole
+// scene shades in lock-step.
+let _hiR = 235, _hiG = 200, _hiB = 140;
+// Per-frame style for the branch top-edge highlight (see Branch.draw).
+let _branchHiA = 0, _branchHiStyle = '';
 // Smoothed 0..1 multiplier on every sun-shade pass. Ramps over
 // SUN_SHADE_FADE_S real seconds toward 1 (toggle on, not raining)
 // or 0 (toggle off / heavy rain) so flipping either condition
@@ -1885,13 +1896,15 @@ class Branch {
       const branchCx = (this.sx + this.ex) * 0.5;
       const sideNorm = Math.max(-1, Math.min(1,
         (branchCx - W * 0.5) / (W * 0.5)));
-      // lit > 0 → branch on the sun side; lit < 0 → shadow side.
+      // lit > 0 → branch on the lit side; lit < 0 → shadow side. The
+      // highlight target follows the active light (warm sun by day,
+      // cool moon at night).
       const lit = sideNorm * _sunBias;
       if(lit > 0){
         const k = Math.min(1, lit * 0.40 * P.shadeStrength);
-        r = Math.round(r + (235 - r) * k);
-        g = Math.round(g + (200 - g) * k);
-        b = Math.round(b + (140 - b) * k);
+        r = Math.round(r + (_hiR - r) * k);
+        g = Math.round(g + (_hiG - g) * k);
+        b = Math.round(b + (_hiB - b) * k);
       } else {
         const k = Math.min(1, -lit * 0.45 * P.shadeStrength);
         r = Math.round(r * (1 - k));
@@ -1905,6 +1918,21 @@ class Branch {
     ctx.strokeStyle=rgbStr(r,g,b);
     ctx.lineWidth=Math.max(this.thick,0.5);
     ctx.stroke();
+    // Cylindrical form cue on the thick structural branches: a thin
+    // bright line along the upper edge, coloured by the active light
+    // (warm sun / cool moon) and faded by night + rain. Only depth ≤ 2
+    // (a few dozen strokes) so the canopy stays cheap.
+    if(this.depth <= 2 && _branchHiA > 0.015){
+      const tk  = Math.max(this.thick, 0.5);
+      const off = tk * 0.30;
+      ctx.beginPath();
+      ctx.moveTo(this.sx, this.sy - off);
+      ctx.bezierCurveTo(this.p1x, this.p1y - off, this.p2x, this.p2y - off,
+                        this.ex, this.ey - off);
+      ctx.strokeStyle = _branchHiStyle;
+      ctx.lineWidth = tk * 0.28;
+      ctx.stroke();
+    }
     // Icy overlay: pale-blue gradient hugging the upper edge. Vertical
     // linear gradient from above the branch's bounding box to below;
     // the upper-edge of the round-cap stroke picks up the high-alpha
@@ -1936,13 +1964,23 @@ class Branch {
     let autumnTint = 0;
     if(seasonsMode) autumnTint = _season.autumnTint;
     // Per-leaf fill styles are cached on the leaf and only rebuilt when
-    // the (quantised) autumn tint changes — instead of building a fresh
+    // the (quantised) tint inputs change — instead of building a fresh
     // rgba() string for every leaf on every frame.
     const tintQ = Math.round(autumnTint * 32);
+    // Canopy lighting: leaves take the same directional warm/cool tint
+    // as the branches (sun by day, moon at night), computed once per
+    // branch and quantised into the cache key.
+    let litQ = 0;
+    if(_sunBias){
+      const sideNorm = Math.max(-1, Math.min(1, (this.ex - W * 0.5) / (W * 0.5)));
+      litQ = Math.round(sideNorm * _sunBias * 16);   // -16..16
+    }
+    const styleKey = ((tintQ * 33 + litQ + 16) * 2 + _lightCool) * 64 +
+                     Math.min(63, Math.round(P.shadeStrength * 10));
     const ex = this.ex, ey = this.ey, rot = sw * 2.8;
     for(let i = 0; i < n; i++){
       const l = this.leafSeed[i];
-      if(l._styleKey !== tintQ){
+      if(l._styleKey !== styleKey){
         let r = l.r, g = l.g, b = l.b;
         const tk = tintQ / 32;
         if(tk > 0 && l.autR !== undefined){
@@ -1950,8 +1988,19 @@ class Branch {
           g = Math.round(l.g + (l.autG - l.g) * tk);
           b = Math.round(l.b + (l.autB - l.b) * tk);
         }
+        if(litQ > 0){
+          const k = Math.min(1, (litQ / 16) * 0.30 * P.shadeStrength);
+          r = Math.round(r + (_hiR - r) * k);
+          g = Math.round(g + (_hiG - g) * k);
+          b = Math.round(b + (_hiB - b) * k);
+        } else if(litQ < 0){
+          const k = Math.min(1, (-litQ / 16) * 0.35 * P.shadeStrength);
+          r = Math.round(r * (1 - k));
+          g = Math.round(g * (1 - k));
+          b = Math.round(b * (1 - k));
+        }
         l._style = `rgba(${r},${g},${b},${l.a})`;
-        l._styleKey = tintQ;
+        l._styleKey = styleKey;
       }
       // ellipse() takes a rotation directly — no save/translate/rotate/
       // restore round-trip per leaf.
@@ -2763,6 +2812,22 @@ function allBranches(){
 //  When falling, all four limbs flail with sin/cos noise.
 //  Two-bone IK (law of cosines) drives every limb each frame.
 // ════════════════════════════════════════════════════════
+// Deterministic fur tufts along the sloth's body silhouette —
+// {a: angle on the body ellipse, len, droop}. Angles skirt the head
+// (bottom centre) so the tufts read on the flanks and back; droop
+// biases the tips downward like real hanging-sloth fur.
+const SLOTH_FUR = [
+  { a: -0.62 * PI, len: 4.5, droop: 2.0 },
+  { a: -0.38 * PI, len: 5.0, droop: 2.2 },
+  { a: -0.13 * PI, len: 4.0, droop: 1.6 },
+  { a:  0.08 * PI, len: 4.5, droop: 2.4 },
+  { a:  0.24 * PI, len: 5.5, droop: 2.8 },
+  { a:  0.40 * PI, len: 4.5, droop: 3.0 },
+  { a:  0.60 * PI, len: 4.5, droop: 3.0 },
+  { a:  0.76 * PI, len: 5.5, droop: 2.8 },
+  { a:  0.92 * PI, len: 4.0, droop: 2.4 },
+];
+
 class Sloth{
   /*
    * 4-LIMB SLOTH
@@ -3886,13 +3951,17 @@ _eat(dt){
   // lock-step with the trunk and canopy.
   _shaded(r, g, b){
     const lit = this._slothLit;
-    if(!lit) return `rgb(${r},${g},${b})`;
+    if(!lit) return rgbStr(r, g, b);
     if(lit > 0){
       const k = Math.min(1, lit * 0.40 * P.shadeStrength);
-      return `rgb(${Math.round(r + (235 - r) * k)},${Math.round(g + (200 - g) * k)},${Math.round(b + (140 - b) * k)})`;
+      return rgbStr(Math.round(r + (_hiR - r) * k),
+                    Math.round(g + (_hiG - g) * k),
+                    Math.round(b + (_hiB - b) * k));
     }
     const k = Math.min(1, -lit * 0.45 * P.shadeStrength);
-    return `rgb(${Math.round(r * (1 - k))},${Math.round(g * (1 - k))},${Math.round(b * (1 - k))})`;
+    return rgbStr(Math.round(r * (1 - k)),
+                  Math.round(g * (1 - k)),
+                  Math.round(b * (1 - k)));
   }
 
   // Radial gradients for the body/head/face, cached in body-local
@@ -3955,6 +4024,21 @@ _eat(dt){
     ctx.fillStyle=this._shaded(0x8B, 0x6C, 0x42); ctx.fill();
     ctx.fillStyle = G.body;
     ctx.beginPath(); ctx.ellipse(0,0,BWs,BH,0,0,PI*2); ctx.fill();
+    // ── FUR TUFTS — short strokes breaking up the elliptical
+    // silhouette; they droop downward like hanging-sloth fur and pick
+    // up the directional shading via _shaded ──
+    ctx.strokeStyle = this._shaded(0x5E, 0x47, 0x2A);
+    ctx.lineWidth = 1.3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for(const f of SLOTH_FUR){
+      const ca = Math.cos(f.a), sa = Math.sin(f.a);
+      ctx.moveTo(ca * (BWs - 1), sa * (BH - 1));
+      ctx.quadraticCurveTo(
+        ca * (BWs + f.len * 0.5), sa * (BH + f.len * 0.5) + f.droop * 0.4,
+        ca * (BWs + f.len),       sa * (BH + f.len) + f.droop);
+    }
+    ctx.stroke();
     // Belly cream (with its own subtle gradient) — tracks the scaled body width
     ctx.fillStyle = G.belly;
     ctx.beginPath(); ctx.ellipse(0,3,BWs*.62,BH*.55,0,0,PI*2); ctx.fill();
@@ -3966,6 +4050,27 @@ _eat(dt){
     // 3D shading
     ctx.fillStyle = G.head;
     ctx.beginPath(); ctx.ellipse(0, hy, HR*1.08, HR*.98, 0, 0, PI*2); ctx.fill();
+
+    // ── DIRECTIONAL RIM LIGHT — a thin bright arc along the
+    // light-facing edge of body + head (warm sun by day, cool moon at
+    // night) ties the sloth into the scene's directional light ──
+    if(_sunBias && !this.charred){
+      const aRim = Math.min(0.60, Math.abs(_sunBias) * 0.50 * P.shadeStrength);
+      if(aRim > 0.03){
+        ctx.save();
+        if(_sunBias < 0) ctx.scale(-1, 1);   // mirror when lit from the left
+        ctx.strokeStyle = `rgba(${_hiR},${_hiG},${_hiB},${aRim.toFixed(3)})`;
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, BWs - 1.0, BH - 1.0, 0, -PI * 0.34, PI * 0.26);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(0, hy, HR * 1.08 - 0.8, HR * 0.98 - 0.8, 0, -PI * 0.30, PI * 0.30);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     // ── EARS (small, tucked into head) ──
     const earY = hy - HR*0.50;
@@ -6551,7 +6656,16 @@ function restartGame(){
 // off; natural sunset still drives strength via sun.opacity.
 function drawSunShade(){
   if(_sunShadeFade <= 0.001) return;
-  const sun = getSunPos(dayTime);
+  // The sun drives the pass by day; at night the moon takes over with
+  // a weaker, cool-blue soft-light so the scene keeps a directional
+  // light source around the clock.
+  let src = getSunPos(dayTime);
+  let cool = false;
+  if(src.opacity <= 0){
+    src = getMoonPos(dayTime);
+    cool = true;
+  }
+  const sun = src;
   if(sun.opacity <= 0) return;
   // The sun disc is drawn inside applyCameraTransform (via
   // drawSunMoon), so its visual screen position depends on
@@ -6564,7 +6678,8 @@ function drawSunShade(){
   // Strength scales with sun.opacity (sunset fade) and the
   // dev-mode SHADE STRENGTH slider. Capped so the soft-light
   // blend can't punch pure black/white at high values.
-  const strength = Math.min(0.95, sun.opacity * _sunShadeFade * 0.40 * P.shadeStrength);
+  const strength = Math.min(0.95,
+    sun.opacity * _sunShadeFade * (cool ? 0.20 : 0.40) * P.shadeStrength);
 
   // Radial gradient anchored at the visual sun position. Bright
   // warm at the centre, mid-neutral at half-radius, cool dark at
@@ -6576,9 +6691,15 @@ function drawSunShade(){
   const radius = Math.hypot(W, H);
   const grad = ctx.createRadialGradient(
     sxScreen, syScreen, 0, sxScreen, syScreen, radius);
-  grad.addColorStop(0,   `rgba(255, 230, 170, ${strength})`);
-  grad.addColorStop(0.5, `rgba(180, 170, 140, ${strength * 0.30})`);
-  grad.addColorStop(1,   `rgba(15, 20, 40,   ${strength * 0.70})`);
+  if(cool){
+    grad.addColorStop(0,   `rgba(195, 215, 255, ${strength})`);
+    grad.addColorStop(0.5, `rgba(145, 155, 190, ${strength * 0.30})`);
+    grad.addColorStop(1,   `rgba(8, 12, 32,    ${strength * 0.70})`);
+  } else {
+    grad.addColorStop(0,   `rgba(255, 230, 170, ${strength})`);
+    grad.addColorStop(0.5, `rgba(180, 170, 140, ${strength * 0.30})`);
+    grad.addColorStop(1,   `rgba(15, 20, 40,   ${strength * 0.70})`);
+  }
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
@@ -7291,6 +7412,14 @@ function drawTrunk(){
     );
   }
   ctx.stroke();
+  // Ambient occlusion where the trunk meets the grass — grounds the
+  // tree instead of letting the bark gradient run straight into the
+  // meadow.
+  const ao = ctx.createLinearGradient(0, trunkBY - 36, 0, trunkBY + 9);
+  ao.addColorStop(0, 'rgba(8,4,2,0)');
+  ao.addColorStop(1, 'rgba(8,4,2,0.45)');
+  ctx.fillStyle = ao;
+  ctx.fillRect(trunkBX - bw - 2, trunkBY - 36, bw * 2 + 4, 45);
   ctx.restore();
 
   // Root buttresses — anchored at the base, unaffected by sway
@@ -7338,13 +7467,36 @@ function frame(ts){
     else if(_sunShadeFade > target) _sunShadeFade = Math.max(target, _sunShadeFade - step);
   }
   _sunBias = 0;
+  _lightCool = 0;
   if(_sunShadeFade > 0){
     const sun = getSunPos(dayTime);
     if(sun.opacity > 0){
       let raw = ((sun.x - W * 0.5) / (W * 0.5)) * sun.opacity;
       raw = Math.max(-1, Math.min(1, raw));
       _sunBias = raw * _sunShadeFade;
+    } else {
+      // Moonlight — the moon takes over as the directional light at
+      // night: same side-bias model, a bit weaker, and the highlight
+      // colour flips to a cool blue below.
+      const moon = getMoonPos(dayTime);
+      if(moon.opacity > 0){
+        let raw = ((moon.x - W * 0.5) / (W * 0.5)) * moon.opacity * 0.55;
+        raw = Math.max(-1, Math.min(1, raw));
+        _sunBias = raw * _sunShadeFade;
+        _lightCool = 1;
+      }
     }
+  }
+  // Highlight colour of the active light (warm sun ↔ cool moon) and
+  // the top-edge highlight style for structural branches. The line is
+  // strongest in daylight and falls to a faint cool sheen at night.
+  _hiR = Math.round(235 - 70 * _lightCool);
+  _hiG = Math.round(200 - 10 * _lightCool);
+  _hiB = Math.round(140 + 95 * _lightCool);
+  {
+    const glow = clamp((getSceneBrightness(dayTime) - 0.32) / 0.68, 0, 1);
+    _branchHiA = (0.06 + 0.20 * glow) * (1 - rainIntensity * 0.7);
+    _branchHiStyle = `rgba(${_hiR},${_hiG},${_hiB},${_branchHiA.toFixed(3)})`;
   }
   Audio.updateWind(Wind.str);
 
