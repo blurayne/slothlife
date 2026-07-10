@@ -2349,12 +2349,19 @@ function insertHighscore(name, s, extras = {}){
 loadHighscores();
 let scorePopups = [];   // {x, y, vy, age, life, text, color}
 let leafFlashes = new Map();  // branch → countdown (1→0)
-const HUNGER_DECAY_AWAKE  = 1 / 120;
-// Sleeping drains hunger at 18% of the awake rate — i.e. 82% energy
-// saving while asleep. Sleep is the survival lever in this game; a
-// large gap between awake/asleep rates rewards the player for letting
-// the sloth nap when food is scarce, matching real-sloth biology.
-const HUNGER_DECAY_ASLEEP = HUNGER_DECAY_AWAKE * 0.18;
+// Awake drain, eased 10% from the historical 1/120 so the sloth loses
+// less energy while awake — this softens active play and, critically,
+// the summer-wake window (months 6-8: at ≤10% hunger the sloth is forced
+// awake and would otherwise burn its last reserve fast), which is the
+// game's main loss condition. ~10% gentler awake drain → a bit easier.
+const HUNGER_DECAY_AWAKE  = (1 / 120) * 0.90;   // was 1 / 120
+// Asleep drain is pinned to its prior ABSOLUTE value (1/120 × 0.18), NOT
+// re-derived from the now-cheaper awake rate — the ask was "lose less
+// energy WHEN AWAKE", so the sleep economy is left exactly as it was.
+// (As a side effect the awake→asleep saving ratio reads ~80% now instead
+// of 82%, purely because awake got cheaper; sleeping costs the same
+// energy/sec it always did.)
+const HUNGER_DECAY_ASLEEP = (1 / 120) * 0.18;
 const HUNGER_LEAF_GAIN    = 0.01;
 const HUNGER_APPLE_GAIN   = 0.10;
 
@@ -7580,9 +7587,9 @@ function frame(ts){
   // Game-over → either prompt for name or show end screen
   _checkPostGameTransition();
 
-  // Hunger decay. While SLEEPING the rate is 18% of the awake rate
-  // (HUNGER_DECAY_ASLEEP = HUNGER_DECAY_AWAKE × 0.18) — 82% energy
-  // saving while asleep. At 0 → starvation.
+  // Hunger decay. Awake and asleep rates are independent constants now
+  // (asleep = 1/120 × 0.18, awake = 1/120 × 0.90); sleeping saves ~80%
+  // energy/sec vs awake. At 0 → starvation.
   if(sloth && sloth.alive && !gameOver){
     if(sloth.state !== 'STARVING'){
       const baseDecay = sloth.state === 'SLEEPING' ? HUNGER_DECAY_ASLEEP : HUNGER_DECAY_AWAKE;

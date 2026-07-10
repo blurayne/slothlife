@@ -16,8 +16,8 @@ in-game months   = seconds_to_empty / DAY_CYCLE_S      (DAY_CYCLE_S = 90)
 
 | Knob | Meaning | Current value | Source |
 | --- | --- | --- | --- |
-| `HUNGER_DECAY_AWAKE` | base awake drain / real sec | `1 / 120` | `assets/main.js` |
-| `HUNGER_DECAY_ASLEEP` | asleep drain = awake × mult | `× 0.18` (82 % saving) | `assets/main.js` |
+| `HUNGER_DECAY_AWAKE` | base awake drain / real sec | **`1/120 × 0.90`** (10 % eased) | `assets/main.js` |
+| `HUNGER_DECAY_ASLEEP` | asleep drain (independent constant) | `1/120 × 0.18` (~80 % saving vs awake) | `assets/main.js` |
 | `P.hungerPace` (default & effective) | global drain multiplier | **`1.90`** (2.0 baseline − 5 %) | `assets/main.js` / `index.html` |
 | `HUNGER_LEAF_GAIN` | hunger refilled per leaf | `+0.01` | `assets/main.js` |
 | `HUNGER_APPLE_GAIN` | hunger refilled per apple | `+0.10` | `assets/main.js` |
@@ -37,7 +37,8 @@ except the asleep multiplier has held its `471b2e6` value ever since.
 | 2026-05-06 18:54 | `471b2e6` | initial commit; hunger system as it stands today | `× 0.20` | 80 % | `1/120` | `2.0` | `30` |
 | 2026-05-06 19:53 | `2954d7e` | "82 % energy saving while asleep (was 80 %)" | `× 0.18` | 82 % | `1/120` | `2.0` | `30` |
 | 2026-05-06 → 2026-07-10 | (no change) | no starve constant touched in between | `× 0.18` | 82 % | `1/120` | `2.0`* | `30` |
-| 2026-07-10 | (this change) | removed on-load calibration override; ship documented pace eased 5 % for win-rate | `× 0.18` | 82 % | `1/120` | **`1.90`** | `30` |
+| 2026-07-10 (a) | (pace fix) | removed on-load calibration override; ship documented pace eased 5 % for win-rate | `× 0.18` | 82 % | `1/120` | **`1.90`** | `30` |
+| 2026-07-10 (b) | (awake easing) | awake drain eased 10 %, asleep pinned to its old absolute rate → ~10 % better odds | asleep held (abs `1/120×0.18`) | ~80 % | **`1/120 × 0.90`** | `1.90` | `30` |
 
 \* `2.0` was only ever the *nominal* default — until 2026-07-10 the
 on-load calibration silently forced the effective value to ≈0.58 (see
@@ -45,12 +46,12 @@ below).
 
 **Bottom line:** inside git history the starving-speed constants that
 ever changed are (1) the asleep multiplier `0.20 → 0.18` on
-2026-05-06 19:53 (`2954d7e`), and (2) `hungerPace` on 2026-07-10 — the
-on-load calibration override was removed and the default set to `1.90`
-(the `2.0` design baseline eased 5 % so the player loses less energy and
-wins ~5 % more often; eating scores + hunger gains untouched). Awake
-rate, leaf/apple gains, `endMonths`, and `dayPace` have been constant
-since the first commit.
+2026-05-06 19:53 (`2954d7e`), (2) `hungerPace` on 2026-07-10 — override
+removed, default set to `1.90` (2.0 baseline − 5 %), and (3) the awake
+rate on 2026-07-10 — `HUNGER_DECAY_AWAKE` eased 10 % (`1/120 × 0.90`)
+with `HUNGER_DECAY_ASLEEP` decoupled to its old absolute value so only
+awake play got cheaper. Eating scores + hunger gains, leaf/apple counts,
+`endMonths`, and `dayPace` are all untouched.
 
 ## Historical calibration gotcha (fixed 2026-07-10)
 
@@ -69,18 +70,20 @@ on-load call was present from the first commit (`471b2e6`), so the
 effective difficulty never matched the `2.0` the panel and docs implied.
 
 The on-load call has now been removed, so the documented pace is what
-actually runs. The shipped value is `1.90` (2.0 − 5 %). Effective
-full→empty times now (`hungerPace = 1.90`, asleep `× 0.18`,
+actually runs. The shipped value is `1.90` (2.0 − 5 %), with the awake
+rate eased a further 10 %. Effective full→empty times now
+(`hungerPace = 1.90`, awake `1/120 × 0.90`, asleep abs `1/120 × 0.18`,
 `DAY_CYCLE_S = 90`):
 
 | State | Drain / sec | Full → empty | In-game months |
 | --- | --- | --- | --- |
-| Awake | `≈ 0.01583` | `≈ 63 s` | `≈ 0.70` |
+| Awake | `≈ 0.01425` | `≈ 70 s` | `≈ 0.78` |
 | Asleep | `≈ 0.00285` | `≈ 351 s` | `≈ 3.9` |
 
-(At the pre-fix `≈0.58` these were ~207 s / ~1150 s — i.e. the game just
-got meaningfully harder, matching the documented design minus the 5 %
-easing.)
+(Awake was `≈ 63 s` before the 10 % awake easing; asleep is unchanged.
+At the pre-fix `≈0.58` pace these were ~207 s / ~1150 s — i.e. removing
+the override made the game meaningfully harder, and these two easings
+walk ~15 % of the awake cost back.)
 
 The `calibrateHungerFor11_5Months()` helper + its dev-panel button are
 still defined for manual experimentation; they simply no longer fire on

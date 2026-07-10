@@ -6,7 +6,7 @@ line so they stay verifiable as the game evolves.
 
 ## TL;DR — six rules
 
-1. **Sleep is the survival lever.** Asleep, hunger drains 5.5×
+1. **Sleep is the survival lever.** Asleep, hunger drains 5×
    slower than awake. Idle for 3 + seconds and the sloth nods off
    automatically.
 2. **Eat apples early** — spring + summer of year 1, before autumn
@@ -18,7 +18,7 @@ line so they stay verifiable as the game evolves.
 4. **Stay above 10 % hunger before/during summer.** In months 6-8
    (Jul-Sep), at hunger ≤ 10 %, the sloth refuses to sleep
    (`main.js:6770-6787`). It will burn through the rest of its
-   reserve at the awake rate — 5.5× faster — and starve in
+   reserve at the awake rate — 5× faster — and starve in
    minutes.
 5. **Winter is pure sleep.** No leaves, no apples. You survive on
    the stockpile you brought in.
@@ -29,19 +29,28 @@ line so they stay verifiable as the game evolves.
 
 All values are at the default `dayPace = 1.0`, `hungerPace = 1.90`.
 
-> **Pace note.** The shipped `hungerPace` is **1.90** — the historical
-> `2.0` design baseline eased by **5 %** so the player loses less energy
-> and wins ~5 % more often (eating scores + hunger gains are unchanged).
-> This is now the value the game actually boots with: the old on-load
-> `calibrateHungerFor11_5Months()` override (which silently forced
-> ≈0.58) has been removed. The survival times in this doc are computed
-> at the `2.0` baseline; at the shipped `1.90` they run ~5 % longer
-> (e.g. asleep-from-full ≈ 351 s instead of 333 s). See `DIFFICULTY.md`.
+> **Pace note.** Two easings sit on top of the historical baseline, both
+> "lose less energy" (eating scores + hunger gains are unchanged):
+> 1. `hungerPace` is **1.90** — the `2.0` design baseline eased **5 %**
+>    (global, awake + asleep). The old on-load
+>    `calibrateHungerFor11_5Months()` override (which silently forced
+>    ≈0.58) has been removed, so this documented pace is what the game
+>    actually boots with.
+> 2. `HUNGER_DECAY_AWAKE` is eased a further **10 %** (`1/120 × 0.90`),
+>    **awake only** — the asleep rate is pinned to its old absolute value
+>    so the sleep economy is untouched. This softens active play and the
+>    summer-wake death window for ~10 % better odds.
+>
+> Net: the awake/asleep drain ratio is now **5×** (was 5.5×), and the
+> awake-saving figure reads ~80 % (was 82 %) purely because awake got
+> cheaper. Survival numbers below are quoted at the `2.0` baseline;
+> asleep runs ~5 % longer at the shipped pace, awake ~15 % longer
+> (5 % pace + 10 % awake). See `DIFFICULTY.md`.
 
 | Constant | Value | Source |
 |---|---|---|
-| `HUNGER_DECAY_AWAKE` | 1/120 per real sec | `main.js` |
-| `HUNGER_DECAY_ASLEEP` | × 0.18 (82 % energy saving) | `main.js` |
+| `HUNGER_DECAY_AWAKE` | 1/120 × 0.90 per real sec (10 % eased) | `main.js` |
+| `HUNGER_DECAY_ASLEEP` | 1/120 × 0.18 (independent; ~80 % saving vs awake) | `main.js` |
 | `HUNGER_LEAF_GAIN` | +0.01 (+1 %) | `main.js` |
 | `HUNGER_APPLE_GAIN` | +0.10 (+10 %) | `main.js` |
 | `P.hungerPace` | 1.90 (2.0 baseline − 5 %) | `main.js` |
@@ -94,7 +103,7 @@ wake-up rule:
 
 | Life | Start | What happens | End (cumulative real time) |
 |---|---|---|---|
-| 1 | 100 % hunger, April | Sleeps until hunger ≈ 10 % around mid-July (summer). Sloth wakes; awake drain (5.5× faster) burns the last 10 % in ~6 s. | ~310 s (5:10) |
+| 1 | 100 % hunger, April | Sleeps until hunger ≈ 10 % around mid-July (summer). Sloth wakes; awake drain (5× faster) burns the last 10 % in ~6 s. | ~310 s (5:10) |
 | 2 | 80 % hunger, mid-July | Sleeps. Hunger dips to 10 % just *after* summer ends (early Oct), so summer-wake doesn't catch it. Sleeps to 0. | ~580 s (9:40) |
 | 3 | 80 % hunger, autumn | Sleeps through autumn → winter. Reaches 0 in winter. Game over. | ~852 s (14:12) |
 
@@ -105,8 +114,10 @@ or leaf points.
 
 ### Doing absolutely nothing AND staying awake (worst case)
 
-Drain = `(1/120) × 2.0 = 0.0167 / s`. Life 1 ≈ 60 s, lives 2-3 ≈
-48 s each → **~2 min 45 s total**. Sleep is roughly 5× better.
+Drain = `(1/120 × 0.90) × 2.0 = 0.015 / s` (awake rate eased 10 %).
+Life 1 ≈ 67 s, lives 2-3 ≈ 53 s each → **~3 min total**. Sleep is
+roughly 5× better. (At the shipped `hungerPace = 1.90` these run a
+further ~5 % longer: life 1 ≈ 70 s.)
 
 ### What one apple buys you
 
@@ -124,9 +135,13 @@ do not.
 
 ### Single-life expectancy from full hunger
 
-- Awake from 100 %: 60 s (≈ 0.67 in-game months)
-- **Asleep from 100 %: 333 s (≈ 3.7 in-game months)**
+- Awake from 100 %: 67 s (≈ 0.74 in-game months) — was 60 s before the
+  10 % awake easing
+- **Asleep from 100 %: 333 s (≈ 3.7 in-game months)** — unchanged (sleep
+  economy untouched)
 - Asleep from 80 % (respawn): 267 s (≈ 3.0 in-game months)
+
+(All at the `2.0` baseline; add ~5 % for the shipped `1.90` pace.)
 
 ## Month-by-month strategy (year 1)
 
@@ -215,7 +230,9 @@ Defaults to watch — these have been tuned multiple times in
 recent commits and the strategy in this doc assumes the
 post-2026-05-06 values:
 
-- `HUNGER_DECAY_ASLEEP × 0.18` (was 0.20, was 0.70 earlier).
+- `HUNGER_DECAY_AWAKE = 1/120 × 0.90` (awake eased 10 %; was plain 1/120).
+- `HUNGER_DECAY_ASLEEP = 1/120 × 0.18` — now an independent absolute
+  constant (asleep 0.20, 0.70 earlier). Awake/asleep ratio 5× (was 5.5×).
 - `P.hungerPace = 1.90` (2.0 design baseline eased 5 % for win-rate;
   was silently ≈0.58 on load before the calibration override was removed).
 - `P.shadeStrength = 1.6` (was 1.8 earlier — visual only,

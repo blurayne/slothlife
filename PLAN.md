@@ -14,6 +14,7 @@ _(none — see "Shipped this batch" below.)_
 
 ## Shipped this batch
 
+- [x] **Awake-only easing: −10% awake hunger drain** — `HUNGER_DECAY_AWAKE` eased 10% (`1/120 × 0.90`) with `HUNGER_DECAY_ASLEEP` decoupled to its old absolute value, so only awake play (and the summer-wake death window) gets cheaper; ~10% better odds, sleep economy + eating scores untouched — [plan](.claude/plans/awake-drain-easing.md)
 - [x] **Starving pace: match GAMEPLAY.md, eased 5% for win-rate** — removed the on-load `calibrateHungerFor11_5Months()` override (was silently forcing `hungerPace ≈ 0.58`, ~3.4× gentler than documented) so the game runs the documented pace; set `hungerPace` default `2.0 → 1.90` (5% less energy loss, eating scores/gains untouched); docs synced — [plan](.claude/plans/starving-pace-match-gameplay-md.md)
 - [x] **Performance pass + lighting/rendering upgrade (tree & sloth)** — per-frame caches for wind fBm / season info / branch list / colour strings, cloud sprites, gradient + sloth-body-gradient caching, DOM write throttling; moonlight directional shading at night, canopy leaves join the sun-shade system, branch top-edge highlights, trunk base AO + stable bark, sloth rim light + fur tufts — [plan](.claude/plans/game-perf-lighting-rendering.md)
 - [x] **Lower icy rain threshold + dev-only RAIN OVERRIDE toggle** — `ICY_RAIN_THRESH` 0.55 → 0.30 so cold-rain icing engages at moderate rain, plus a dev-only manual rain control (toggle + slider) mirroring the existing `dayAuto` / `s-time` pattern — [plan](.claude/plans/rain-override-debug-toggle.md)
