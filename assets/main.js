@@ -61,7 +61,7 @@ const P = {
   branchLen:   0.8,
   grass:       4.80,
   dayPace:     1.0,
-  hungerPace:  2.0,
+  hungerPace:  1.90,   // GAMEPLAY.md baseline 2.0, eased 5% (lose less energy → ~5% better win odds)
   weightMult:  1.0,
   endMonths:   30,
   musicVol:    0.75,
@@ -8016,11 +8016,14 @@ applyTimeLeft();
 // "no scores yet" message shows for fresh players (renderHighscoreTable
 // otherwise only ran on between-runs returns to the start screen).
 renderHighscoreTable('ov-start-hs', { limit: HS_MAX_BOARD });
-// Apply the 11.5-month sleep-starvation calibration once on load so the
-// game starts with the realistic sloth-metabolism setting (≈0.23x at
-// default dayPace=1). Done here so all referenced constants (DAY_CYCLE_S
-// in particular) and DOM elements are fully initialized.
-calibrateHungerFor11_5Months();
+// STARVING PACE is left at its documented default (P.hungerPace, see the
+// LIVE PARAMETERS block) instead of being recalibrated on load. The old
+// on-load calibrateHungerFor11_5Months() call silently overrode the
+// default with ≈0.58x, which made the shipped game ~3.4x gentler than
+// the tuning documented in GAMEPLAY.md. The game now runs at the
+// documented pace (eased 5% for win-rate — see P.hungerPace). The
+// calibration helper + its dev-panel button remain available for manual
+// experimentation; they just no longer fire automatically.
 requestAnimationFrame(frame);
 
 // Service worker — network-first for HTML so a fresh deploy is picked

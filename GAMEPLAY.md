@@ -27,16 +27,24 @@ line so they stay verifiable as the game evolves.
 
 ## Stats
 
-All values are at the default `dayPace = 1.0`, `hungerPace = 2.0`
-(`main.js:46-47`).
+All values are at the default `dayPace = 1.0`, `hungerPace = 1.90`.
+
+> **Pace note.** The shipped `hungerPace` is **1.90** — the historical
+> `2.0` design baseline eased by **5 %** so the player loses less energy
+> and wins ~5 % more often (eating scores + hunger gains are unchanged).
+> This is now the value the game actually boots with: the old on-load
+> `calibrateHungerFor11_5Months()` override (which silently forced
+> ≈0.58) has been removed. The survival times in this doc are computed
+> at the `2.0` baseline; at the shipped `1.90` they run ~5 % longer
+> (e.g. asleep-from-full ≈ 351 s instead of 333 s). See `DIFFICULTY.md`.
 
 | Constant | Value | Source |
 |---|---|---|
-| `HUNGER_DECAY_AWAKE` | 1/120 per real sec | `main.js:2020` |
-| `HUNGER_DECAY_ASLEEP` | × 0.18 (82 % energy saving) | `main.js:2025` |
-| `HUNGER_LEAF_GAIN` | +0.01 (+1 %) | `main.js:2026` |
-| `HUNGER_APPLE_GAIN` | +0.10 (+10 %) | `main.js:2027` |
-| `P.hungerPace` | 2.0 default | `main.js:47` |
+| `HUNGER_DECAY_AWAKE` | 1/120 per real sec | `main.js` |
+| `HUNGER_DECAY_ASLEEP` | × 0.18 (82 % energy saving) | `main.js` |
+| `HUNGER_LEAF_GAIN` | +0.01 (+1 %) | `main.js` |
+| `HUNGER_APPLE_GAIN` | +0.10 (+10 %) | `main.js` |
+| `P.hungerPace` | 1.90 (2.0 baseline − 5 %) | `main.js` |
 | `DAY_CYCLE_S` | 90 real sec / in-game day | `main.js:4703` |
 | `P.endMonths` | 30 (full game) | `main.js:49` |
 | Apple density | 0.10 per deep branch (regrows each Jul-Aug) | `main.js:43, 4007, 4172-4193` |
@@ -208,7 +216,8 @@ recent commits and the strategy in this doc assumes the
 post-2026-05-06 values:
 
 - `HUNGER_DECAY_ASLEEP × 0.18` (was 0.20, was 0.70 earlier).
-- `P.hungerPace = 2.0` (set via the dev panel).
+- `P.hungerPace = 1.90` (2.0 design baseline eased 5 % for win-rate;
+  was silently ≈0.58 on load before the calibration override was removed).
 - `P.shadeStrength = 1.6` (was 1.8 earlier — visual only,
   no gameplay impact).
 - Winter band shortened from 3 months to 2 months (Jan-Feb only).
