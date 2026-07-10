@@ -6,6 +6,7 @@
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 const wfill  = document.getElementById('wfill');
+let _lastWindPct = '';
 const hintEl = document.getElementById('hint');
 let W, H;
 const resize = () => { W = canvas.width = innerWidth; H = canvas.height = innerHeight; };
@@ -16,6 +17,22 @@ const lerp  = (a,b,t) => a + (b-a)*t;
 const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
 const PI = Math.PI;
 const {sin, cos, atan2, abs, sign} = Math;
+
+// Memoised `rgb(r,g,b)` strings — the branch/leaf/star hot paths would
+// otherwise build hundreds of identical colour strings per frame. Keys
+// are packed ints; the cache is cleared if it ever balloons (e.g. a
+// long session sweeping through every seasonal tint).
+const _rgbStrCache = new Map();
+function rgbStr(r,g,b){
+  const key = (r<<16)|(g<<8)|b;
+  let s = _rgbStrCache.get(key);
+  if(s === undefined){
+    if(_rgbStrCache.size > 8192) _rgbStrCache.clear();
+    s = `rgb(${r},${g},${b})`;
+    _rgbStrCache.set(key,s);
+  }
+  return s;
+}
 
 // fade hint after a few seconds
 setTimeout(()=>hintEl.classList.add('fade'), 300);
@@ -1519,6 +1536,14 @@ const tRainOverride = document.getElementById('t-rain-override');
 const lRainOverride = document.getElementById('l-rain-override');
 const sRain         = document.getElementById('s-rain');
 const vRain         = document.getElementById('v-rain');
+// Cached refs for the auto-advancing TIME/MONTH mirrors (frame loop) —
+// getElementById per frame is wasted work.
+const sTimeEl  = document.getElementById('s-time');
+const vTimeEl  = document.getElementById('v-time');
+const sMonthEl = document.getElementById('s-month');
+const vMonthEl = document.getElementById('v-month');
+// Panel-mirror throttle state — see frame().
+let _panelSyncT = 0;
 let rainOverride      = false;
 let rainOverrideValue = 0;
 function applyRainOverride(){
@@ -1564,6 +1589,7 @@ if(tIcyForce){
 const hudWind  = document.getElementById('hud');
 const hudTleft = document.getElementById('timeleft');
 const tlVal    = document.getElementById('tleft-val');
+let _tleftLast = '';
 const tTleft   = document.getElementById('t-tleft');
 const lTleft   = document.getElementById('l-tleft');
 let timeLeftMode = false;
@@ -1599,7 +1625,8 @@ function updateTimeLeftHUD(){
   } else {
     remainingMonths = P.endMonths;
   }
-  tlVal.textContent = _formatTimeLeft(remainingMonths * DAY_CYCLE_S / D);
+  const txt = _formatTimeLeft(remainingMonths * DAY_CYCLE_S / D);
+  if(txt !== _tleftLast){ tlVal.textContent = txt; _tleftLast = txt; }
 }
 
 // SEASONS — always on (the panel toggle is gone). Kept as a const so
@@ -1662,6 +1689,7 @@ function fBm(x,oct=5){
 // ════════════════════════════════════════════════════════
 const Wind = {
   t:0, mag:0.7, targetMag:0.9, timer:0, period:2.0,
+  _base:0, _str:0,
   tick(dt){
     this.t+=dt; this.timer+=dt;
     // Rain amplifies the wind: rainIntensity 0..1 maps to 1×..1.8×
@@ -1681,8 +1709,10 @@ const Wind = {
     }
     this.mag      += (this.targetMag-this.mag)*Math.min(dt*2.6,1);
     this.targetMag = Math.max(0.28*P.windForce*rainBoost, this.targetMag-dt*0.22);
-  },
-  sample(m=1){
+    // sample(m) is linear in m, so the fBm bands only need one
+    // evaluation per tick — every per-branch/per-blade call then
+    // reduces to a multiply. Numerically identical to sampling
+    // inline; the bands depend only on this.t and the live params.
     // Rain also bumps the high-frequency turbulence band so the
     // canopy chatters more violently in a storm — distinct from
     // the rainBoost on this.mag (which is broadband). At
@@ -1691,9 +1721,11 @@ const Wind = {
     const sweep=fBm(this.t*0.09*sp,3);
     const gust =fBm(this.t*0.60*sp+44,3)*0.48;
     const trb  =fBm(this.t*2.40*sp+88,2)*0.18*tb*2;
-    return (sweep+gust+trb)*this.mag*m;
+    this._base = (sweep+gust+trb)*this.mag;
+    this._str  = clamp(abs(fBm(this.t*0.09*sp,2))*this.mag/1.6, 0, 1);
   },
-  get str(){ return clamp(abs(fBm(this.t*0.09*P.windSpeed,2))*this.mag/1.6, 0, 1); }
+  sample(m=1){ return this._base*m; },
+  get str(){ return this._str; }
 };
 
 // ════════════════════════════════════════════════════════
@@ -1836,7 +1868,7 @@ class Branch {
     let r = BR[d], g = BG[d], b = BB[d];
     // Winter: branches turn near-black
     if(seasonsMode){
-      const wn = getSeasonInfo(seasonTime).winterness;
+      const wn = _season.winterness;
       if(wn > 0){
         r = Math.round(r + (12 - r) * wn);
         g = Math.round(g + (10 - g) * wn);
@@ -1870,9 +1902,8 @@ class Branch {
     ctx.beginPath();
     ctx.moveTo(this.sx,this.sy);
     ctx.bezierCurveTo(this.p1x,this.p1y,this.p2x,this.p2y,this.ex,this.ey);
-    ctx.strokeStyle=`rgb(${r},${g},${b})`;
+    ctx.strokeStyle=rgbStr(r,g,b);
     ctx.lineWidth=Math.max(this.thick,0.5);
-    ctx.lineCap='round';
     ctx.stroke();
     // Icy overlay: pale-blue gradient hugging the upper edge. Vertical
     // linear gradient from above the branch's bounding box to below;
@@ -1892,7 +1923,6 @@ class Branch {
       ctx.bezierCurveTo(this.p1x, this.p1y, this.p2x, this.p2y, this.ex, this.ey);
       ctx.strokeStyle = grad;
       ctx.lineWidth   = tk;
-      ctx.lineCap     = 'round';
       ctx.stroke();
     }
     for(const c of this.children) c.draw();
@@ -1901,31 +1931,40 @@ class Branch {
   _drawLeaves(){
     const sw = this.spring.x;
     const n = Math.min(P.leaves|0, this.leafSeed.length);
+    if(n <= 0) return;
     const flash = leafFlashes.get(this) || 0;
     let autumnTint = 0;
-    if(seasonsMode) autumnTint = getSeasonInfo(seasonTime).autumnTint;
+    if(seasonsMode) autumnTint = _season.autumnTint;
+    // Per-leaf fill styles are cached on the leaf and only rebuilt when
+    // the (quantised) autumn tint changes — instead of building a fresh
+    // rgba() string for every leaf on every frame.
+    const tintQ = Math.round(autumnTint * 32);
+    const ex = this.ex, ey = this.ey, rot = sw * 2.8;
     for(let i = 0; i < n; i++){
       const l = this.leafSeed[i];
-      ctx.save();
-      ctx.translate(this.ex + l.ox, this.ey + l.oy);
-      ctx.rotate(l.r0 + sw * 2.8);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, l.rx, l.ry, 0, 0, PI * 2);
-      let r = l.r, g = l.g, b = l.b;
-      if(autumnTint > 0 && l.autR !== undefined){
-        r = Math.round(l.r + (l.autR - l.r) * autumnTint);
-        g = Math.round(l.g + (l.autG - l.g) * autumnTint);
-        b = Math.round(l.b + (l.autB - l.b) * autumnTint);
+      if(l._styleKey !== tintQ){
+        let r = l.r, g = l.g, b = l.b;
+        const tk = tintQ / 32;
+        if(tk > 0 && l.autR !== undefined){
+          r = Math.round(l.r + (l.autR - l.r) * tk);
+          g = Math.round(l.g + (l.autG - l.g) * tk);
+          b = Math.round(l.b + (l.autB - l.b) * tk);
+        }
+        l._style = `rgba(${r},${g},${b},${l.a})`;
+        l._styleKey = tintQ;
       }
-      ctx.fillStyle = `rgba(${r},${g},${b},${l.a})`;
+      // ellipse() takes a rotation directly — no save/translate/rotate/
+      // restore round-trip per leaf.
+      ctx.beginPath();
+      ctx.ellipse(ex + l.ox, ey + l.oy, l.rx, l.ry, l.r0 + rot, 0, PI * 2);
+      ctx.fillStyle = l._style;
       ctx.fill();
       if(flash > 0){
         ctx.beginPath();
-        ctx.ellipse(0, 0, l.rx, l.ry, 0, 0, PI * 2);
+        ctx.ellipse(ex + l.ox, ey + l.oy, l.rx, l.ry, l.r0 + rot, 0, PI * 2);
         ctx.fillStyle = `rgba(255,255,255,${flash * 0.9})`;
         ctx.fill();
       }
-      ctx.restore();
     }
   }
 }
@@ -2296,6 +2335,7 @@ const PRIM_DEFS=[
   {ang: 0.72,lenM:1.08},{ang: 1.22,lenM:1.24},
 ];
 function buildTree(){
+  _allBranchesCache = null;   // structure changes — drop the memoised list
   roots=PRIM_DEFS.map(({ang,lenM})=>{
     const a=ang+(Math.random()-.5)*0.11;
     const len=H*(0.15+Math.random()*0.04)*lenM * P.branchLen;
@@ -2568,7 +2608,7 @@ function drawGrass(){
   // Hide grass blades under snow during winter.
   let grassAlpha = 1;
   if(seasonsMode){
-    const wn = getSeasonInfo(seasonTime).winterness;
+    const wn = _season.winterness;
     grassAlpha = 1 - wn;
     if(grassAlpha <= 0.02) return;
   }
@@ -2584,8 +2624,13 @@ function drawGrass(){
   ctx.save();
   ctx.globalAlpha *= grassAlpha;
   // Render grass three times (offset by -W, 0, +W) so the field tiles
-  // continuously while the camera pans.
+  // continuously while the camera pans — but cull tiles fully outside
+  // the visible world range first (at rest only the centre tile shows,
+  // so 2/3 of the blade strokes are skipped outright).
+  const wx0 = canvasToWorldX(0) - 80;    // margin for wind bend
+  const wx1 = canvasToWorldX(W) + 80;
   for(const tileX of [-W, 0, W]){
+    if(tileX > wx1 || tileX + W < wx0) continue;
     for(const bucket of grassBuckets){
       ctx.strokeStyle = bucket.stroke;
       ctx.lineWidth = bucket.width;
@@ -2687,11 +2732,16 @@ function nearestBranch(px,py){
   roots.forEach(scan);
   return {branch:best,t:bestT,dist:bestD};
 }
-/** Flatten the branch tree into a list. */
+/** Flatten the branch tree into a list. Memoised — the tree's structure
+ *  only changes on buildTree() (which invalidates the cache), yet the
+ *  season/leaf/apple systems ask for the full list every frame. */
+let _allBranchesCache = null;
 function allBranches(){
+  if(_allBranchesCache) return _allBranchesCache;
   const list=[];
   const collect=(b)=>{list.push(b);b.children.forEach(collect);};
   roots.forEach(collect);
+  _allBranchesCache = list;
   return list;
 }
 
@@ -3845,61 +3895,92 @@ _eat(dt){
     return `rgb(${Math.round(r * (1 - k))},${Math.round(g * (1 - k))},${Math.round(b * (1 - k))})`;
   }
 
+  // Radial gradients for the body/head/face, cached in body-local
+  // space. Only the belly-scale-dependent ones ever change, and then
+  // only when the (1/64-quantised) belly bucket moves — everything
+  // else is built exactly once per sloth.
+  _bodyGrads(){
+    const bucket = Math.round(bellyScale * 64);
+    if(this._grads && this._gradKey === bucket) return this._grads;
+    const {BW,BH,HR} = this;
+    const BWq = BW * bucket / 64;
+    const hy = BH - 2;
+    const g = {};
+    g.body = ctx.createRadialGradient(BWq*0.30, -BH*0.30, BWq*0.10, 0, 0, BWq*1.15);
+    g.body.addColorStop(0,    'rgba(195,158,108,0.75)');
+    g.body.addColorStop(0.30, 'rgba(140,108,68,0)');
+    g.body.addColorStop(0.85, 'rgba(50,32,16,0)');
+    g.body.addColorStop(1,    'rgba(30,18,8,0.65)');
+    g.belly = ctx.createRadialGradient(0, 3, 1, 0, 3, BWq*0.7);
+    g.belly.addColorStop(0, '#E5C290');
+    g.belly.addColorStop(1, '#C9A16E');
+    g.head = ctx.createRadialGradient(HR*0.30, hy-HR*0.30, HR*0.10, 0, hy, HR*1.15);
+    g.head.addColorStop(0,    'rgba(205,150,95,0.75)');
+    g.head.addColorStop(0.40, 'rgba(140,90,50,0)');
+    g.head.addColorStop(1,    'rgba(28,14,6,0.70)');
+    g.mask = ctx.createRadialGradient(0, hy-1, HR*0.20, 0, hy+2, HR*0.95);
+    g.mask.addColorStop(0,   'rgba(252,228,188,0.55)');
+    g.mask.addColorStop(0.7, 'rgba(237,201,144,0)');
+    g.mask.addColorStop(1,   'rgba(150,95,55,0.55)');
+    g.irisL = ctx.createRadialGradient(-4.7-0.5, hy-0.4-0.2, 0.3, -4.7, hy-0.4+0.2, 2.6);
+    g.irisL.addColorStop(0,   'rgba(140,80,30,0.85)');
+    g.irisL.addColorStop(0.55,'rgba(60,28,10,0.0)');
+    g.irisR = ctx.createRadialGradient(4.7-0.5, hy-0.4-0.2, 0.3, 4.7, hy-0.4+0.2, 2.6);
+    g.irisR.addColorStop(0,   'rgba(140,80,30,0.85)');
+    g.irisR.addColorStop(0.55,'rgba(60,28,10,0.0)');
+    g.snout = ctx.createRadialGradient(0, hy+2.8, 0.5, 0, hy+3.5, 5);
+    g.snout.addColorStop(0, 'rgba(252,225,180,0.85)');
+    g.snout.addColorStop(1, 'rgba(160,110,70,0.30)');
+    this._grads = g; this._gradKey = bucket;
+    return g;
+  }
+
   _drawBody(bx,by){
     const {BW,BH,HR}=this;
+
+    // Draw in body-local coordinates: translate once, then everything
+    // renders around (0,0). This keeps the cached radial gradients
+    // above valid regardless of where the sloth hangs.
+    ctx.save();
+    ctx.translate(bx, by);
 
     // Hunger-driven belly scale comes from the global `bellyScale`,
     // which smooths toward _bellyTarget() over ~1 in-game day. See the
     // tick logic in frame() near the idle timer.
     const BWs = BW * bellyScale;
+    const G = this._bodyGrads();
 
     // ── BODY with 3D radial shading (light from upper-right) ──
-    ctx.beginPath(); ctx.ellipse(bx,by,BWs,BH,0,0,PI*2);
+    ctx.beginPath(); ctx.ellipse(0,0,BWs,BH,0,0,PI*2);
     ctx.fillStyle=this._shaded(0x8B, 0x6C, 0x42); ctx.fill();
-    const bodyGrad = ctx.createRadialGradient(bx+BWs*0.30, by-BH*0.30, BWs*0.10, bx, by, BWs*1.15);
-    bodyGrad.addColorStop(0,    'rgba(195,158,108,0.75)');
-    bodyGrad.addColorStop(0.30, 'rgba(140,108,68,0)');
-    bodyGrad.addColorStop(0.85, 'rgba(50,32,16,0)');
-    bodyGrad.addColorStop(1,    'rgba(30,18,8,0.65)');
-    ctx.fillStyle = bodyGrad;
-    ctx.beginPath(); ctx.ellipse(bx,by,BWs,BH,0,0,PI*2); ctx.fill();
+    ctx.fillStyle = G.body;
+    ctx.beginPath(); ctx.ellipse(0,0,BWs,BH,0,0,PI*2); ctx.fill();
     // Belly cream (with its own subtle gradient) — tracks the scaled body width
-    const bellyGrad = ctx.createRadialGradient(bx, by+3, 1, bx, by+3, BWs*0.7);
-    bellyGrad.addColorStop(0, '#E5C290');
-    bellyGrad.addColorStop(1, '#C9A16E');
-    ctx.fillStyle = bellyGrad;
-    ctx.beginPath(); ctx.ellipse(bx,by+3,BWs*.62,BH*.55,0,0,PI*2); ctx.fill();
+    ctx.fillStyle = G.belly;
+    ctx.beginPath(); ctx.ellipse(0,3,BWs*.62,BH*.55,0,0,PI*2); ctx.fill();
 
     // ── HEAD: warm chestnut brown, big rounded silhouette ──
-    const hy = by + BH - 2;
-    ctx.beginPath(); ctx.ellipse(bx, hy, HR*1.08, HR*.98, 0, 0, PI*2);
+    const hy = BH - 2;
+    ctx.beginPath(); ctx.ellipse(0, hy, HR*1.08, HR*.98, 0, 0, PI*2);
     ctx.fillStyle=this._shaded(0x7A, 0x4A, 0x28); ctx.fill();
     // 3D shading
-    const headGrad = ctx.createRadialGradient(bx+HR*0.30, hy-HR*0.30, HR*0.10, bx, hy, HR*1.15);
-    headGrad.addColorStop(0,    'rgba(205,150,95,0.75)');
-    headGrad.addColorStop(0.40, 'rgba(140,90,50,0)');
-    headGrad.addColorStop(1,    'rgba(28,14,6,0.70)');
-    ctx.fillStyle = headGrad;
-    ctx.beginPath(); ctx.ellipse(bx, hy, HR*1.08, HR*.98, 0, 0, PI*2); ctx.fill();
+    ctx.fillStyle = G.head;
+    ctx.beginPath(); ctx.ellipse(0, hy, HR*1.08, HR*.98, 0, 0, PI*2); ctx.fill();
 
     // ── EARS (small, tucked into head) ──
     const earY = hy - HR*0.50;
     ctx.fillStyle='#5A3618';
-    ctx.beginPath(); ctx.ellipse(bx-HR*0.82, earY, HR*0.26, HR*0.30, -0.20, 0, PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(bx+HR*0.82, earY, HR*0.26, HR*0.30,  0.20, 0, PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-HR*0.82, earY, HR*0.26, HR*0.30, -0.20, 0, PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( HR*0.82, earY, HR*0.26, HR*0.30,  0.20, 0, PI*2); ctx.fill();
 
     // ── CREAM FACE MASK — large, warm, slightly heart-shaped ──
     // Forms the bright lower-face panel that the eyes and nose sit on.
     ctx.beginPath();
-    ctx.ellipse(bx, hy+2, HR*0.92, HR*0.86, 0, 0, PI*2);
+    ctx.ellipse(0, hy+2, HR*0.92, HR*0.86, 0, 0, PI*2);
     ctx.fillStyle='#EDC990'; ctx.fill();
     // Warm rim shading
-    const maskGrad = ctx.createRadialGradient(bx, hy-1, HR*0.20, bx, hy+2, HR*0.95);
-    maskGrad.addColorStop(0,   'rgba(252,228,188,0.55)');
-    maskGrad.addColorStop(0.7, 'rgba(237,201,144,0)');
-    maskGrad.addColorStop(1,   'rgba(150,95,55,0.55)');
-    ctx.fillStyle = maskGrad;
-    ctx.beginPath(); ctx.ellipse(bx, hy+2, HR*0.92, HR*0.86, 0, 0, PI*2); ctx.fill();
+    ctx.fillStyle = G.mask;
+    ctx.beginPath(); ctx.ellipse(0, hy+2, HR*0.92, HR*0.86, 0, 0, PI*2); ctx.fill();
 
     // ── ICONIC SLOTH EYE STRIPES ──
     // Each eye sits inside a comma/teardrop-shaped dark patch: a round
@@ -3911,27 +3992,27 @@ _eat(dt){
     ctx.fillStyle = '#2A1408';
     // LEFT eye round mask
     ctx.beginPath();
-    ctx.ellipse(bx-eyeOffX, hy+eyeOffY, 4.4, 3.6, -0.10, 0, PI*2);
+    ctx.ellipse(-eyeOffX, hy+eyeOffY, 4.4, 3.6, -0.10, 0, PI*2);
     ctx.fill();
     // LEFT stripe tail — angled long ellipse going down-outward
     ctx.beginPath();
-    ctx.ellipse(bx-eyeOffX-2.6, hy+eyeOffY+3.6, 2.0, 4.6, -0.55, 0, PI*2);
+    ctx.ellipse(-eyeOffX-2.6, hy+eyeOffY+3.6, 2.0, 4.6, -0.55, 0, PI*2);
     ctx.fill();
     // RIGHT eye round mask
     ctx.beginPath();
-    ctx.ellipse(bx+eyeOffX, hy+eyeOffY, 4.4, 3.6, 0.10, 0, PI*2);
+    ctx.ellipse(eyeOffX, hy+eyeOffY, 4.4, 3.6, 0.10, 0, PI*2);
     ctx.fill();
     // RIGHT stripe tail — mirror
     ctx.beginPath();
-    ctx.ellipse(bx+eyeOffX+2.6, hy+eyeOffY+3.6, 2.0, 4.6, 0.55, 0, PI*2);
+    ctx.ellipse(eyeOffX+2.6, hy+eyeOffY+3.6, 2.0, 4.6, 0.55, 0, PI*2);
     ctx.fill();
     // Soft fade where stripes meet the cheek fur (blends into head outline)
     ctx.fillStyle = 'rgba(42,20,8,0.40)';
     ctx.beginPath();
-    ctx.ellipse(bx-eyeOffX-3.0, hy+eyeOffY+5.5, 2.6, 3.0, -0.55, 0, PI*2);
+    ctx.ellipse(-eyeOffX-3.0, hy+eyeOffY+5.5, 2.6, 3.0, -0.55, 0, PI*2);
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(bx+eyeOffX+3.0, hy+eyeOffY+5.5, 2.6, 3.0, 0.55, 0, PI*2);
+    ctx.ellipse(eyeOffX+3.0, hy+eyeOffY+5.5, 2.6, 3.0, 0.55, 0, PI*2);
     ctx.fill();
 
     // ── EYES (big, almost-black, glossy with strong white catchlight) ──
@@ -3947,26 +4028,20 @@ _eat(dt){
     // pure black when the sloth is dying.
     ctx.fillStyle = dying ? '#000' : '#1B0E06';
     ctx.beginPath();
-    ctx.ellipse(bx-eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
+    ctx.ellipse(-eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(bx+eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
+    ctx.ellipse(eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
     ctx.fill();
     // Warm brown iris ring (subtle inner glow) — skipped when dying.
     if(!dying && eyeH > 0.4){
-      const irisG_L = ctx.createRadialGradient(bx-eyeOffX-0.5, hy+eyeOffY-0.2, 0.3, bx-eyeOffX, hy+eyeOffY+0.2, 2.6);
-      irisG_L.addColorStop(0,   'rgba(140,80,30,0.85)');
-      irisG_L.addColorStop(0.55,'rgba(60,28,10,0.0)');
-      ctx.fillStyle = irisG_L;
+      ctx.fillStyle = G.irisL;
       ctx.beginPath();
-      ctx.ellipse(bx-eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
+      ctx.ellipse(-eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
       ctx.fill();
-      const irisG_R = ctx.createRadialGradient(bx+eyeOffX-0.5, hy+eyeOffY-0.2, 0.3, bx+eyeOffX, hy+eyeOffY+0.2, 2.6);
-      irisG_R.addColorStop(0,   'rgba(140,80,30,0.85)');
-      irisG_R.addColorStop(0.55,'rgba(60,28,10,0.0)');
-      ctx.fillStyle = irisG_R;
+      ctx.fillStyle = G.irisR;
       ctx.beginPath();
-      ctx.ellipse(bx+eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
+      ctx.ellipse(eyeOffX, hy+eyeOffY+0.2, 2.6, 2.6*eyeH, 0, 0, PI*2);
       ctx.fill();
     }
     // Strong white catchlight (the bright spark that gives the eye life)
@@ -3974,27 +4049,24 @@ _eat(dt){
     if(!dying && eyeH > 0.5){
       ctx.fillStyle = 'rgba(255,255,255,0.98)';
       ctx.beginPath();
-      ctx.ellipse(bx-eyeOffX-0.6, hy+eyeOffY-0.5, 1.0, 0.9, 0, 0, PI*2);
+      ctx.ellipse(-eyeOffX-0.6, hy+eyeOffY-0.5, 1.0, 0.9, 0, 0, PI*2);
       ctx.fill();
       ctx.beginPath();
-      ctx.ellipse(bx+eyeOffX-0.6, hy+eyeOffY-0.5, 1.0, 0.9, 0, 0, PI*2);
+      ctx.ellipse(eyeOffX-0.6, hy+eyeOffY-0.5, 1.0, 0.9, 0, 0, PI*2);
       ctx.fill();
       // Tiny secondary highlight underneath (wet-eye effect)
       ctx.fillStyle = 'rgba(220,210,200,0.55)';
       ctx.beginPath();
-      ctx.arc(bx-eyeOffX+0.7, hy+eyeOffY+1.1, 0.35, 0, PI*2);
+      ctx.arc(-eyeOffX+0.7, hy+eyeOffY+1.1, 0.35, 0, PI*2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(bx+eyeOffX+0.7, hy+eyeOffY+1.1, 0.35, 0, PI*2);
+      ctx.arc(eyeOffX+0.7, hy+eyeOffY+1.1, 0.35, 0, PI*2);
       ctx.fill();
     }
 
     // ── SNOUT / MUZZLE (subtle bump under the nose) ──
-    const snoutGrad = ctx.createRadialGradient(bx, hy+2.8, 0.5, bx, hy+3.5, 5);
-    snoutGrad.addColorStop(0, 'rgba(252,225,180,0.85)');
-    snoutGrad.addColorStop(1, 'rgba(160,110,70,0.30)');
-    ctx.fillStyle = snoutGrad;
-    ctx.beginPath(); ctx.ellipse(bx, hy+3.6, 4.2, 3.0, 0, 0, PI*2); ctx.fill();
+    ctx.fillStyle = G.snout;
+    ctx.beginPath(); ctx.ellipse(0, hy+3.6, 4.2, 3.0, 0, 0, PI*2); ctx.fill();
 
     // ── NOSE — small, warm pinkish-brown button ──
     // Replaces the old large dark nose with the softer warm-toned one
@@ -4002,17 +4074,17 @@ _eat(dt){
     ctx.fillStyle = '#7A4828';
     ctx.beginPath();
     // Heart/triangle-ish: round on top, narrower at bottom
-    ctx.ellipse(bx, hy+2.7, 1.8, 1.4, 0, 0, PI*2);
+    ctx.ellipse(0, hy+2.7, 1.8, 1.4, 0, 0, PI*2);
     ctx.fill();
     // Soft pink highlight on top-left of nose
     ctx.fillStyle = 'rgba(225,170,140,0.75)';
     ctx.beginPath();
-    ctx.ellipse(bx-0.5, hy+2.3, 0.9, 0.55, 0, 0, PI*2);
+    ctx.ellipse(-0.5, hy+2.3, 0.9, 0.55, 0, 0, PI*2);
     ctx.fill();
     // Tiny dark nostrils
     ctx.fillStyle = '#1A0A04';
-    ctx.beginPath(); ctx.arc(bx-0.55, hy+3.0, 0.30, 0, PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(bx+0.55, hy+3.0, 0.30, 0, PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-0.55, hy+3.0, 0.30, 0, PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 0.55, hy+3.0, 0.30, 0, PI*2); ctx.fill();
 
     if(this.mouthChewT > 0){
       // ── CHEWING MOUTH ──
@@ -4023,31 +4095,33 @@ _eat(dt){
       const open = 0.5 - 0.5 * Math.cos(t * PI);           // 0..1, two cycles
       ctx.fillStyle = '#1A0A04';
       ctx.beginPath();
-      ctx.ellipse(bx, hy + 4.7, 2.4, 0.6 + open * 1.8, 0, 0, PI*2);
+      ctx.ellipse(0, hy + 4.7, 2.4, 0.6 + open * 1.8, 0, 0, PI*2);
       ctx.fill();
       if(open > 0.4){
         ctx.fillStyle = 'rgba(220,130,110,0.75)';
         ctx.beginPath();
-        ctx.ellipse(bx, hy + 5.1, 1.2, 0.4 * (open - 0.4), 0, 0, PI*2);
+        ctx.ellipse(0, hy + 5.1, 1.2, 0.4 * (open - 0.4), 0, 0, PI*2);
         ctx.fill();
       }
     } else {
       // ── GENTLE SMILE (soft curve, slight upturned corners) ──
       ctx.strokeStyle = '#1A0A04'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(bx-2.8, hy+4.6);
-      ctx.quadraticCurveTo(bx, hy+5.5, bx+2.8, hy+4.6);
+      ctx.moveTo(-2.8, hy+4.6);
+      ctx.quadraticCurveTo(0, hy+5.5, 2.8, hy+4.6);
       ctx.stroke();
       // Subtle upward curl at each corner
       ctx.beginPath();
-      ctx.moveTo(bx-2.8, hy+4.6);
-      ctx.quadraticCurveTo(bx-3.2, hy+4.2, bx-3.0, hy+3.9);
+      ctx.moveTo(-2.8, hy+4.6);
+      ctx.quadraticCurveTo(-3.2, hy+4.2, -3.0, hy+3.9);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(bx+2.8, hy+4.6);
-      ctx.quadraticCurveTo(bx+3.2, hy+4.2, bx+3.0, hy+3.9);
+      ctx.moveTo(2.8, hy+4.6);
+      ctx.quadraticCurveTo(3.2, hy+4.2, 3.0, hy+3.9);
       ctx.stroke();
     }
+
+    ctx.restore();
   }
 }
 
@@ -4313,7 +4387,7 @@ function spawnFruits(){
 let _icyFreezeEpoch = 0;     // bumps every time the freeze state changes
 let _icyFreezeMode  = 'none'; // 'force' | 'winter' | 'none'
 function _updateBranchIcing(){
-  const info = getSeasonInfo(seasonTime);
+  const info = _season;
   const inWinterBand = info.day < 2;            // Jan-Feb
   // Dev-only FORCE ICY toggle wins over the natural winter
   // trigger so the slip mechanic can be tested without setting
@@ -4348,7 +4422,7 @@ function _updateBranchIcing(){
 // Spring: between days 10..12, new apples grow on eligible branches up
 // to the regular appleCount density.
 function _updateSeasonApples(dt){
-  const info = getSeasonInfo(seasonTime);
+  const info = _season;
   // Autumn (Oct-Nov) — apples in the tree drop on their own once the
   // current calendar month passes their personal "drop month". 2-day window;
   // December is stably bare before winter visuals.
@@ -4467,7 +4541,7 @@ function _resetTreeForNewGame(){
 // position (so it visibly drifts away). Spring growth is silent.
 let _lastSeasonLeafiness = -1;
 function _updateSeasonLeaves(dt){
-  const info = getSeasonInfo(seasonTime);
+  const info = _season;
   const day = info.day;
 
   // Calendar season bands:
@@ -5159,6 +5233,11 @@ function getSeasonInfo(t){
 
   return { day: m, name, leafiness, autumnTint, winterness, appleGrowth, summerTint };
 }
+// Per-frame cache of getSeasonInfo(seasonTime). The per-branch and
+// per-leaf draw paths read this instead of recomputing (and
+// re-allocating) the info object hundreds of times per frame.
+// Refreshed at the top of frame() right after seasonTime advances.
+let _season = getSeasonInfo(seasonTime);
 let stars = [];
 
 // Sky color keyframes — top → mid1 → mid2 → bottom (horizon).
@@ -5243,13 +5322,31 @@ function makeStars(){
     });
   }
 }
+// Stars are grouped into a few quantised-alpha buckets so the whole
+// field renders in ≤8 fill() calls instead of one per star (each with
+// its own throwaway rgba() string). The 1/8-step alpha quantisation is
+// invisible on twinkling pinpoints.
+const _starBuckets = Array.from({length: 8}, () => []);
 function drawStars(opacity){
   if(opacity <= 0.01) return;
   const t = performance.now()*0.001;
+  for(const arr of _starBuckets) arr.length = 0;
   for(const s of stars){
     const tw = 0.6 + 0.4*Math.sin(t*1.6 + s.twinkle);
-    ctx.fillStyle = `rgba(255,250,225,${opacity*s.bright*tw})`;
-    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, PI*2); ctx.fill();
+    const a = opacity*s.bright*tw;
+    if(a <= 0.02) continue;
+    _starBuckets[Math.min(7, (a*8)|0)].push(s);
+  }
+  for(let bi = 0; bi < 8; bi++){
+    const arr = _starBuckets[bi];
+    if(!arr.length) continue;
+    ctx.fillStyle = `rgba(255,250,225,${((bi + 0.5) / 8).toFixed(3)})`;
+    ctx.beginPath();
+    for(const s of arr){
+      ctx.moveTo(s.x + s.r, s.y);
+      ctx.arc(s.x, s.y, s.r, 0, PI*2);
+    }
+    ctx.fill();
   }
 }
 function drawSunMoon(){
@@ -5301,7 +5398,7 @@ function drawSunMoon(){
 // camera doesn't desync rays from the disc.
 function drawSummerSunRays(){
   if(!seasonsMode) return;
-  const sInfo = getSeasonInfo(seasonTime);
+  const sInfo = _season;
   if(sInfo.summerTint <= 0) return;
   const sun = getSunPos(dayTime);
   if(sun.opacity <= 0) return;
@@ -5318,15 +5415,17 @@ function drawSummerSunRays(){
   applyCameraTransform();
   ctx.translate(sun.x, sun.y);
   ctx.rotate(rot);
+  // One radial gradient shared by all rays — it's centred at the local
+  // origin, so every ray triangle samples it identically.
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rayLen);
+  grad.addColorStop(0,                              'rgba(255, 253, 225, 0)');
+  grad.addColorStop(sunFrac * 0.55,                 'rgba(255, 240, 170, 0)');
+  grad.addColorStop(sunFrac,                        `rgba(255, 240, 170, ${rayAlpha})`);
+  grad.addColorStop(sunFrac + (1 - sunFrac) * 0.45, `rgba(255, 225, 130, ${rayAlpha * 0.45})`);
+  grad.addColorStop(1,                              'rgba(255, 220, 110, 0)');
+  ctx.fillStyle = grad;
   for(let i = 0; i < rayCount; i++){
     const a = (i / rayCount) * PI * 2;
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rayLen);
-    grad.addColorStop(0,                              'rgba(255, 253, 225, 0)');
-    grad.addColorStop(sunFrac * 0.55,                 'rgba(255, 240, 170, 0)');
-    grad.addColorStop(sunFrac,                        `rgba(255, 240, 170, ${rayAlpha})`);
-    grad.addColorStop(sunFrac + (1 - sunFrac) * 0.45, `rgba(255, 225, 130, ${rayAlpha * 0.45})`);
-    grad.addColorStop(1,                              'rgba(255, 220, 110, 0)');
-    ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(Math.cos(a - halfAng) * rayLen, Math.sin(a - halfAng) * rayLen);
@@ -5352,7 +5451,7 @@ let snowFlakes = [];            // {x, y, vx, vy, r, sway, swayPhase, near}
 // should render as snow instead of rain.
 function _isSnowing(){
   if(!seasonsMode) return 0;
-  return getSeasonInfo(seasonTime).winterness;
+  return _season.winterness;
 }
 
 function updateRain(dt){
@@ -6848,12 +6947,72 @@ function _getBgBlurOffscreen(){
     const c = document.createElement('canvas');
     c.width = targetW;
     c.height = targetH;
-    _bgBlurOff = { canvas: c, ctx: c.getContext('2d'), w: targetW, h: targetH };
+    // Second half-res canvas holding the snapshot WITH the blur baked
+    // in, plus a full-res canvas holding the upscaled result — per
+    // frame we then only pay a cheap unscaled 1:1 drawImage.
+    const b = document.createElement('canvas');
+    b.width = targetW;
+    b.height = targetH;
+    const f = document.createElement('canvas');
+    f.width = W;
+    f.height = H;
+    _bgBlurOff = { canvas: c, ctx: c.getContext('2d'),
+                   baked: b, bakedCtx: b.getContext('2d'),
+                   full: f, fullCtx: f.getContext('2d'),
+                   w: targetW, h: targetH };
+    _bgBlurStamp = -1;   // force a re-bake at the new size
   }
   return _bgBlurOff;
 }
+// Blur-bake bookkeeping — see drawBg(). The blurred backdrop is only
+// re-rendered when the camera moves (pan/zoom must track exactly) or on
+// a ~8 Hz heartbeat for the slow sky/sun drift; the blur itself hides
+// that latency completely.
+let _bgBlurStamp = -1;
+let _bgBlurCamKey = '';
 
-// Render the cloud puffs onto an arbitrary 2D context.
+// Cloud puff layout — shared by the sprite renderer.
+const CLOUD_PUFFS = [[0,0,1,1],[-.44,.18,.66,.80],[.42,.22,.60,.74],[-.20,.30,.44,.60]];
+
+// Rasterise one cloud into its cached offscreen sprite. The content is
+// exactly what the old per-frame path drew straight to the canvas —
+// three puff passes (shadow, body, highlight) with the cloud's own
+// alpha baked in. Geometry + alpha are static per cloud, so the sprite
+// only needs re-rendering when the day/rain palette shifts.
+function _renderCloudSprite(c, baseR, baseG, baseB){
+  const sw = Math.max(4, Math.ceil(c.rx * 3.4));
+  const sh = Math.max(4, Math.ceil(c.ry * 3.0));
+  if(!c._sprite) c._sprite = document.createElement('canvas');
+  if(c._sprite.width !== sw || c._sprite.height !== sh){
+    c._sprite.width = sw; c._sprite.height = sh;
+  }
+  const g = c._sprite.getContext('2d');
+  g.clearRect(0, 0, sw, sh);
+  const cx = sw * 0.5, cy = sh * 0.5;
+  g.fillStyle = `rgba(${(baseR*0.55)|0},${(baseG*0.62)|0},${(baseB*0.78)|0},${c.a*0.55})`;
+  for(const [ox,oy,rx,ry] of CLOUD_PUFFS){
+    g.beginPath();
+    g.ellipse(cx+ox*c.rx, cy+oy*c.ry+c.ry*0.30, c.rx*rx, c.ry*ry*0.95, 0, 0, PI*2);
+    g.fill();
+  }
+  g.fillStyle = `rgba(${baseR|0},${baseG|0},${baseB|0},${c.a})`;
+  for(const [ox,oy,rx,ry] of CLOUD_PUFFS){
+    g.beginPath();
+    g.ellipse(cx+ox*c.rx, cy+oy*c.ry, c.rx*rx, c.ry*ry, 0, 0, PI*2);
+    g.fill();
+  }
+  const hR = Math.min(255, baseR*1.10), hG = Math.min(255, baseG*1.08), hB = Math.min(255, baseB*1.02);
+  g.fillStyle = `rgba(${hR|0},${hG|0},${hB|0},${c.a*0.6})`;
+  for(const [ox,oy,rx,ry] of CLOUD_PUFFS){
+    g.beginPath();
+    g.ellipse(cx+ox*c.rx, cy+oy*c.ry-c.ry*0.22, c.rx*rx*0.78, c.ry*ry*0.65, 0, 0, PI*2);
+    g.fill();
+  }
+}
+
+// Render the cloud puffs onto an arbitrary 2D context. Per frame this is
+// one drawImage per cloud; the 12-ellipse rasterisation only reruns when
+// the quantised palette changes (dawn/dusk and rain transitions).
 function drawCloudsTo(targetCtx){
   const sunUp = (dayTime > 0.22 && dayTime < 0.78);
   const lightT = clamp((dayTime > 0.5 ? 1 - dayTime : dayTime) * 4 - 0.5, 0, 1);
@@ -6862,39 +7021,62 @@ function drawCloudsTo(targetCtx){
   const baseR = (60 + 188*dayShade) * rainShade;
   const baseG = (75 + 177*dayShade) * rainShade;
   const baseB = (95 + 160*dayShade) * rainShade;
+  const palKey = (Math.round(baseR / 3) << 14) | (Math.round(baseG / 3) << 7) | Math.round(baseB / 3);
   for(const c of clouds){
-    const puffs=[[0,0,1,1],[-.44,.18,.66,.80],[.42,.22,.60,.74],[-.20,.30,.44,.60]];
-    targetCtx.fillStyle = `rgba(${(baseR*0.55)|0},${(baseG*0.62)|0},${(baseB*0.78)|0},${c.a*0.55})`;
-    for(const [ox,oy,rx,ry] of puffs){
-      targetCtx.beginPath();
-      targetCtx.ellipse(c.x+ox*c.rx, c.y+oy*c.ry+c.ry*0.30, c.rx*rx, c.ry*ry*0.95, 0, 0, PI*2);
-      targetCtx.fill();
+    if(c._palKey !== palKey || !c._sprite){
+      _renderCloudSprite(c, baseR, baseG, baseB);
+      c._palKey = palKey;
     }
-    targetCtx.fillStyle = `rgba(${baseR|0},${baseG|0},${baseB|0},${c.a})`;
-    for(const [ox,oy,rx,ry] of puffs){
-      targetCtx.beginPath();
-      targetCtx.ellipse(c.x+ox*c.rx, c.y+oy*c.ry, c.rx*rx, c.ry*ry, 0, 0, PI*2);
-      targetCtx.fill();
-    }
-    const hR = Math.min(255, baseR*1.10), hG = Math.min(255, baseG*1.08), hB = Math.min(255, baseB*1.02);
-    targetCtx.fillStyle = `rgba(${hR|0},${hG|0},${hB|0},${c.a*0.6})`;
-    for(const [ox,oy,rx,ry] of puffs){
-      targetCtx.beginPath();
-      targetCtx.ellipse(c.x+ox*c.rx, c.y+oy*c.ry-c.ry*0.22, c.rx*rx*0.78, c.ry*ry*0.65, 0, 0, PI*2);
-      targetCtx.fill();
-    }
+    targetCtx.drawImage(c._sprite, c.x - c._sprite.width*0.5, c.y - c._sprite.height*0.5);
   }
 }
 
+// Gradient caches for drawBg — the sky/haze/ground gradients are
+// rebuilt only when their (quantised) inputs change, not per frame.
+let _skyGrad = null,  _skyGradKey  = '';
+let _hazeGrad = null, _hazeGradKey = 0;
+let _gndGrad = null,  _gndGradKey  = '';
+
+let _bgBlurRebake = true;   // per-frame: whether this frame re-bakes the blur
 function drawBg(){
-  // Time-based sky gradient
+  // Decide whether the blurred-backdrop cache needs re-baking this
+  // frame. Camera motion must track exactly (the snapshot is taken in
+  // screen space); otherwise a ~8 Hz heartbeat is plenty for sun/sky/
+  // scenery drift underneath a blur.
+  if(blurBgMode){
+    const camKey = `${sceneOffsetX.toFixed(1)},${sceneOffsetY.toFixed(1)},${worldZoom.toFixed(3)},${W}x${H}`;
+    const now = performance.now();
+    _bgBlurRebake = _bgBlurStamp < 0 || camKey !== _bgBlurCamKey ||
+                    (now - _bgBlurStamp) > 150;
+    if(_bgBlurRebake){ _bgBlurStamp = now; _bgBlurCamKey = camKey; }
+    if(!_bgBlurRebake){
+      // Fast path: skip the whole sharp-base render (sky, sun, rays,
+      // scenery) and just blit the cached full-res bake 1:1.
+      const off = _getBgBlurOffscreen();
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(off.full, 0, 0);
+      ctx.restore();
+      _drawBgSharpTop();
+      return;
+    }
+  } else {
+    _bgBlurRebake = true;
+  }
+  // Time-based sky gradient. getSkyAtTime returns rounded channels, so
+  // the key is stable whenever the palette is (rebuilds only track
+  // actual colour changes around dawn/dusk).
   const skyC = getSkyAtTime(dayTime);
-  const sky = ctx.createLinearGradient(0,0,0,trunkBY);
-  sky.addColorStop(0,    `rgb(${skyC[0].join(',')})`);
-  sky.addColorStop(0.45, `rgb(${skyC[1].join(',')})`);
-  sky.addColorStop(0.85, `rgb(${skyC[2].join(',')})`);
-  sky.addColorStop(1,    `rgb(${skyC[3].join(',')})`);
-  ctx.fillStyle = sky; ctx.fillRect(-PAN_RANGE-50, 0, W + 2*PAN_RANGE + 100, trunkBY+2);
+  const skyKey = `${trunkBY}|${skyC[0]}|${skyC[1]}|${skyC[2]}|${skyC[3]}`;
+  if(skyKey !== _skyGradKey){
+    const sky = ctx.createLinearGradient(0,0,0,trunkBY);
+    sky.addColorStop(0,    `rgb(${skyC[0].join(',')})`);
+    sky.addColorStop(0.45, `rgb(${skyC[1].join(',')})`);
+    sky.addColorStop(0.85, `rgb(${skyC[2].join(',')})`);
+    sky.addColorStop(1,    `rgb(${skyC[3].join(',')})`);
+    _skyGrad = sky; _skyGradKey = skyKey;
+  }
+  ctx.fillStyle = _skyGrad; ctx.fillRect(-PAN_RANGE-50, 0, W + 2*PAN_RANGE + 100, trunkBY+2);
 
   // Sun & Moon arcs across the sky
   drawSunMoon();
@@ -6913,33 +7095,57 @@ function drawBg(){
   // Distant background scenery (mountains / jungle / forest silhouettes)
   drawBackground();
 
-  // BLUR BG: instead of applying ctx.filter to every individual draw call
-  // (which runs the GPU blur convolution dozens of times per frame), we
-  // snapshot the freshly-drawn sharp background to a half-resolution
-  // offscreen canvas, then blit it back upscaled with a single blur pass.
-  // The downscale + upscale chain itself produces a soft bilinear blur,
-  // so only a small explicit blur is needed. Net cost: ~1 blur op per
-  // frame on a quarter-area canvas, vs ~100+ ops on the full canvas before.
+  // BLUR BG: the sharp background above was just drawn to the main
+  // canvas. Snapshot it to half resolution, bake the blur into a second
+  // half-res canvas, and blit that upscaled. The bake only reruns when
+  // the camera moved or on a ~8 Hz heartbeat (sky/sun/scenery drift is
+  // far too slow for a blurred layer to show 120 ms of staleness) — on
+  // every other frame the sharp draw above is skipped entirely and the
+  // cached bake is blitted straight back (see _bgBlurFresh in the
+  // caller-side gate below).
   if(blurBgMode){
     const off = _getBgBlurOffscreen();
-    const offCtx = off.ctx;
-    // Half-res snapshot: drawImage downsamples from main canvas (W×H)
-    // to offscreen (W/2 × H/2) using bilinear filtering, which already
-    // softens the image considerably.
-    offCtx.clearRect(0, 0, off.w, off.h);
-    offCtx.drawImage(canvas, 0, 0, off.w, off.h);
-    // Blit back with one blur op + bilinear upscale.
-    // Reset the world transform briefly so drawImage maps pixel-for-pixel.
+    if(_bgBlurRebake){
+      const offCtx = off.ctx;
+      // Half-res snapshot: drawImage downsamples from main canvas (W×H)
+      // to offscreen (W/2 × H/2) using bilinear filtering, which already
+      // softens the image considerably.
+      offCtx.clearRect(0, 0, off.w, off.h);
+      offCtx.drawImage(canvas, 0, 0, off.w, off.h);
+      // Bake the blur at half res (radius halved to match the old
+      // full-res blur(3px) look after upscale).
+      const bctx = off.bakedCtx;
+      bctx.clearRect(0, 0, off.w, off.h);
+      bctx.filter = 'blur(1.5px)';
+      bctx.drawImage(off.canvas, 0, 0);
+      bctx.filter = 'none';
+      // Upscale once into the full-res cache; subsequent frames blit
+      // it 1:1 which is far cheaper than a scaled draw.
+      const fctx = off.fullCtx;
+      fctx.clearRect(0, 0, W, H);
+      fctx.imageSmoothingEnabled = true;
+      // 'medium' is indistinguishable from 'high' when upscaling an
+      // already-blurred image, and meaningfully cheaper.
+      fctx.imageSmoothingQuality = 'medium';
+      fctx.drawImage(off.baked, 0, 0, off.w, off.h, 0, 0, W, H);
+    }
+    // Blit the cached full-res blur. Reset the world transform briefly
+    // so drawImage maps pixel-for-pixel.
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    ctx.filter = 'blur(3px)';
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(off.canvas, 0, 0, off.w, off.h, 0, 0, W, H);
+    if(_bgBlurRebake) ctx.clearRect(0, 0, W, H);   // erase the sharp base
+    ctx.drawImage(off.full, 0, 0);
     ctx.restore();
   }
 
+  _drawBgSharpTop();
+}
+
+// The always-sharp upper layers of the background: stars, clouds, the
+// horizon haze, the ground plane and the trunk shadow. Split out so the
+// blur-cache fast path can draw them without re-rendering the (blurred)
+// base underneath.
+function _drawBgSharpTop(){
   // Stars — drawn AFTER the BG blur pass so they always render as crisp
   // pinpoints, never blurred. They still sit behind clouds (drawn next),
   // so a passing cloud can correctly hide a star behind it.
@@ -6948,7 +7154,7 @@ function drawBg(){
   // ── CLOUDS — drawn after bg-blur straight to the main canvas.
   drawCloudsTo(ctx);
 
-  const wnGround = seasonsMode ? getSeasonInfo(seasonTime).winterness : 0;
+  const wnGround = seasonsMode ? _season.winterness : 0;
   // Snow palette destinations for each gradient stop.
   const SNOW_TOP   = [232, 240, 248];   // bright fresh snow at the surface
   const SNOW_DEEP  = [148, 168, 195];   // shadow blue lower down
@@ -6960,22 +7166,32 @@ function drawBg(){
     return `rgb(${nr},${ng},${nb})`;
   };
 
-  const haze=ctx.createLinearGradient(0,trunkBY-65,0,trunkBY);
-  haze.addColorStop(0,'rgba(165,210,232,0)');
-  haze.addColorStop(1,'rgba(165,210,232,0.28)');
-  ctx.fillStyle=haze; ctx.fillRect(-PAN_RANGE-50,trunkBY-65,W + 2*PAN_RANGE + 100,65);
-
-  const gnd=ctx.createLinearGradient(0,trunkBY,0,H);
-  if(wnGround > 0){
-    gnd.addColorStop(0,    lerpHexToRgb('#4e7835', SNOW_TOP,  wnGround));
-    gnd.addColorStop(.06,  lerpHexToRgb('#3b5f22', SNOW_TOP,  wnGround));
-    gnd.addColorStop(.40,  lerpHexToRgb('#2a4818', SNOW_DEEP, wnGround));
-    gnd.addColorStop(1,    lerpHexToRgb('#192e0d', SNOW_DEEP, wnGround));
-  } else {
-    gnd.addColorStop(0,'#4e7835'); gnd.addColorStop(.06,'#3b5f22');
-    gnd.addColorStop(.40,'#2a4818'); gnd.addColorStop(1,'#192e0d');
+  if(_hazeGradKey !== trunkBY){
+    const haze=ctx.createLinearGradient(0,trunkBY-65,0,trunkBY);
+    haze.addColorStop(0,'rgba(165,210,232,0)');
+    haze.addColorStop(1,'rgba(165,210,232,0.28)');
+    _hazeGrad = haze; _hazeGradKey = trunkBY;
   }
-  ctx.fillStyle=gnd; ctx.fillRect(-PAN_RANGE-50,trunkBY,W + 2*PAN_RANGE + 100,H-trunkBY);
+  ctx.fillStyle=_hazeGrad; ctx.fillRect(-PAN_RANGE-50,trunkBY-65,W + 2*PAN_RANGE + 100,65);
+
+  // Ground gradient — winterness quantised to 1/64 steps so the cache
+  // holds through the (slow) winter fade instead of rebuilding per frame.
+  const wnQ = Math.round(wnGround * 64) / 64;
+  const gndKey = `${trunkBY}|${H}|${wnQ}`;
+  if(gndKey !== _gndGradKey){
+    const gnd=ctx.createLinearGradient(0,trunkBY,0,H);
+    if(wnQ > 0){
+      gnd.addColorStop(0,    lerpHexToRgb('#4e7835', SNOW_TOP,  wnQ));
+      gnd.addColorStop(.06,  lerpHexToRgb('#3b5f22', SNOW_TOP,  wnQ));
+      gnd.addColorStop(.40,  lerpHexToRgb('#2a4818', SNOW_DEEP, wnQ));
+      gnd.addColorStop(1,    lerpHexToRgb('#192e0d', SNOW_DEEP, wnQ));
+    } else {
+      gnd.addColorStop(0,'#4e7835'); gnd.addColorStop(.06,'#3b5f22');
+      gnd.addColorStop(.40,'#2a4818'); gnd.addColorStop(1,'#192e0d');
+    }
+    _gndGrad = gnd; _gndGradKey = gndKey;
+  }
+  ctx.fillStyle=_gndGrad; ctx.fillRect(-PAN_RANGE-50,trunkBY,W + 2*PAN_RANGE + 100,H-trunkBY);
 
   // Trunk-shadow ellipse — softer + lighter color in winter (snow shadow)
   ctx.beginPath();
@@ -6987,6 +7203,8 @@ function drawBg(){
   }
   ctx.fill();
 }
+// Stable per-stripe bark wobble — rolled once per page load.
+const BARK_JITTER = Array.from({length: 16}, () => (Math.random() - .5) * 3);
 function drawTrunk(){
   const bw=25,tw=15;
   // Use swayed top — the trunk bends like a flagpole under wind
@@ -7007,7 +7225,7 @@ function drawTrunk(){
     trunkBX+bw,               trunkBY+9
   );
   ctx.closePath();
-  const wn = seasonsMode ? getSeasonInfo(seasonTime).winterness : 0;
+  const wn = seasonsMode ? _season.winterness : 0;
   const tg=ctx.createLinearGradient(trunkBX-bw,0,trunkBX+bw,0);
   if(wn > 0){
     // Lerp the trunk gradient toward near-black for winter.
@@ -7054,21 +7272,25 @@ function drawTrunk(){
     ctx.restore();
   }
 
-  // Bark stripes — also bend with the trunk
+  // Bark stripes — also bend with the trunk. Per-stripe wobble comes
+  // from a fixed jitter table instead of Math.random() per frame, so
+  // the bark is stable (the old per-frame roll made the lines shimmer)
+  // and the hot loop stays allocation-free.
   ctx.save(); ctx.clip();
   ctx.strokeStyle='rgba(0,0,0,0.09)'; ctx.lineWidth=1;
+  let stripeIdx = 0;
+  ctx.beginPath();
   for(let xb = trunkBX-bw+3; xb < trunkBX+bw; xb += 6){
     const xt = xb + dxTop;
-    const w  = (Math.random()-.5)*3;
-    ctx.beginPath();
+    const w  = BARK_JITTER[stripeIdx++ % BARK_JITTER.length];
     ctx.moveTo(xb + w, trunkBY);
     ctx.bezierCurveTo(
       xb + w*.6 + dxTop*.4,  trunkBY-trunkLen*.5,
       xb - w*.4 + dxTop*.7,  trunkBY-trunkLen*.8,
       xt,                     topY
     );
-    ctx.stroke();
   }
+  ctx.stroke();
   ctx.restore();
 
   // Root buttresses — anchored at the base, unaffected by sway
@@ -7125,6 +7347,14 @@ function frame(ts){
     }
   }
   Audio.updateWind(Wind.str);
+
+  // Mirror auto-advancing values (TIME/MONTH/RAIN sliders) into the
+  // settings panel at ~7 Hz and only while the panel is open — writing
+  // slider .value + label .textContent every frame forces DOM style
+  // work at 60 fps for a panel nobody is looking at.
+  _panelSyncT -= dt;
+  const panelSync = panelOpen && _panelSyncT <= 0;
+  if(panelSync) _panelSyncT = 0.15;
 
   // Idle timer — sloth dozes off after 3s of no canvas touches.
   // BUT only starts once the sloth has actually moved at least once,
@@ -7219,7 +7449,7 @@ function frame(ts){
     if(!sloth) return false;
     if(hunger > 0.10) return false;
     if(!seasonsMode) return false;
-    return getSeasonInfo(seasonTime).name === 'SUMMER';
+    return _season.name === 'SUMMER';
   })();
   if(sloth && userIdleT > 3 && sloth.state === 'HANGING' && !isSummerHungry && sloth.mouthChewT <= 0){
     sloth.state = 'SLEEPING';
@@ -7245,11 +7475,12 @@ function frame(ts){
         seasonTime = ((seasonTime + (dt * P.dayPace) / DAY_CYCLE_S / 12) % 1 + 1) % 1;
       }
       P.month = seasonTime * 12;
-      const sM = document.getElementById('s-month');
-      const vM = document.getElementById('v-month');
-      if(sM){ sM.value = P.month.toFixed(2); }
-      if(vM){ vM.textContent = monthFmt(P.month); }
+      if(panelSync){
+        if(sMonthEl){ sMonthEl.value = P.month.toFixed(2); }
+        if(vMonthEl){ vMonthEl.textContent = monthFmt(P.month); }
+      }
     }
+    _season = getSeasonInfo(seasonTime);
     _updateSeasonLeaves(dt);
     _updateSeasonApples(dt);
     _updateBranchIcing();
@@ -7259,10 +7490,10 @@ function frame(ts){
   if(dayAuto){
     dayTime = ((dayTime + (dt * P.dayPace)/DAY_CYCLE_S) % 1 + 1) % 1;
     P.time = dayTime;
-    const sT = document.getElementById('s-time');
-    const vT = document.getElementById('v-time');
-    if(sT){ sT.value = dayTime.toFixed(3); }
-    if(vT){ vT.textContent = dayTime.toFixed(2); }
+    if(panelSync){
+      if(sTimeEl){ sTimeEl.value = dayTime.toFixed(3); }
+      if(vTimeEl){ vTimeEl.textContent = dayTime.toFixed(2); }
+    }
   }
   // Rain
   updateRain(dt);
@@ -7272,8 +7503,10 @@ function frame(ts){
   // toggling override ON doesn't snap rain to a stale value.
   // Skip when override is ON — the slider is already the source.
   if(!rainOverride){
-    if(sRain){ sRain.value = rainIntensity.toFixed(2); }
-    if(vRain){ vRain.textContent = rainIntensity.toFixed(2); }
+    if(panelSync){
+      if(sRain){ sRain.value = rainIntensity.toFixed(2); }
+      if(vRain){ vRain.textContent = rainIntensity.toFixed(2); }
+    }
     rainOverrideValue = rainIntensity;
   }
   updateLightning(dt);
@@ -7326,14 +7559,16 @@ function frame(ts){
     }
   }
 
-  // Fruits + falling-leaves entities
+  // Fruits + falling-leaves entities. Filter (allocate) only when
+  // something actually died this frame — not twice per frame always.
   if(fruitsMode){
-    for(const f of fruits) f.update(dt);
-    fruits = fruits.filter(f => f.alive !== false);
-    fruits = fruits.filter(f=>f.alive);
+    let fruitDied = false;
+    for(const f of fruits){ f.update(dt); if(!f.alive) fruitDied = true; }
+    if(fruitDied) fruits = fruits.filter(f=>f.alive);
     spawnFallingLeavesIfWindy(dt);
-    for(const l of fallingLeaves) l.update(dt);
-    fallingLeaves = fallingLeaves.filter(l=>l.alive);
+    let leafDied = false;
+    for(const l of fallingLeaves){ l.update(dt); if(!l.alive) leafDied = true; }
+    if(leafDied) fallingLeaves = fallingLeaves.filter(l=>l.alive);
   }
 
   // Wind streak particles
@@ -7385,6 +7620,9 @@ function frame(ts){
   // tall grass instead of stickered onto a flat field).
   drawDeadTrunks();
   drawGrass();
+  // Round caps for every branch stroke — set once here instead of per
+  // branch inside Branch.draw().
+  ctx.lineCap = 'round';
   for(const r of roots) r.draw();
   if(fruitsMode){
     for(const f of fruits) f.draw();
@@ -7426,7 +7664,7 @@ function frame(ts){
   // Season scene tints (summer golden wash, autumn warm wash, winter
   // white/blue wash).
   if(seasonsMode){
-    const sInfo = getSeasonInfo(seasonTime);
+    const sInfo = _season;
     // Summer — instead of a flat overlay (which would flatten contrast),
     // use a soft-light blend with a warm orange color. Soft-light keeps
     // bright pixels bright and dark pixels dark, but pushes the whole
@@ -7493,7 +7731,10 @@ function frame(ts){
   drawLivesHUD();
   drawGameOverHUD();
 
-  wfill.style.width=(Wind.str*100).toFixed(0)+'%';
+  {
+    const windPct = (Wind.str*100).toFixed(0)+'%';
+    if(windPct !== _lastWindPct){ wfill.style.width = windPct; _lastWindPct = windPct; }
+  }
   updateTimeLeftHUD();
   // PAUSED overlay — drawn last so it sits over all canvas content.
   if(paused){
